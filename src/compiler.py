@@ -83,6 +83,7 @@ class KnowledgeCompiler:
             api_key=cfg.SILICONFLOW_API_KEY,
             base_url=cfg.SILICONFLOW_BASE_URL,
         )
+        self._short_doc_texts: dict[str, str] = {}  # doc_id → full text
 
     # ── Main entry point ──────────────────────────────────────────────────
 
@@ -111,7 +112,9 @@ class KnowledgeCompiler:
                     self.registry.update_document_status(doc["id"], "compiled")
                 # Atomically materialize compiled_library/
                 from src.materializer import Materializer
-                Materializer().materialize(run_id, self.registry)
+                Materializer().materialize(
+                    run_id, self.registry, self._short_doc_texts
+                )
 
             self.registry.complete_compile_run(
                 run_id,
@@ -196,8 +199,6 @@ class KnowledgeCompiler:
             tier = self.classifier.classify(result)
             tokens = self.classifier.estimate_tokens(result.text)
             has_structure = len(result.headings) >= 2
-            # Store full text for short docs (used by Agent retrieval)
-            full_text = result.text if tier == "short" else None
             self.registry.update_document_status(
                 doc_id,
                 "classified",
@@ -205,8 +206,11 @@ class KnowledgeCompiler:
                 token_count=tokens,
                 has_structure=has_structure,
                 title=result.title,
-                full_text=full_text,
             )
+
+            # Cache short doc text for materializer
+            if tier == "short":
+                self._short_doc_texts[doc_id] = result.text
 
             # Embed (with cache check)
             cached = self.registry.get_embedding(doc_id)

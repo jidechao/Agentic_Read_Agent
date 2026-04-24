@@ -15,14 +15,18 @@ logger = logging.getLogger(__name__)
 class Materializer:
     """Atomically writes compiled_library/ output using tmp→bak→rename pattern."""
 
-    def materialize(self, compile_run_id: int, registry: Any) -> None:
+    def materialize(
+        self,
+        compile_run_id: int,
+        registry: Any,
+        short_doc_texts: dict[str, str] | None = None,
+    ) -> None:
         """Atomically write compiled_library/ output.
 
-        Steps:
-        1. Write to compiled_library.tmp/
-        2. Remove old compiled_library.bak/ if exists
-        3. Rename compiled_library/ → compiled_library.bak/
-        4. Rename compiled_library.tmp/ → compiled_library/
+        Args:
+            compile_run_id: The compile run to materialize.
+            registry: Knowledge registry for document/cluster queries.
+            short_doc_texts: Mapping of doc_id → full text for short documents.
         """
         compiled_dir = cfg.COMPILED_DIR
         tmp_dir = compiled_dir.parent / (compiled_dir.name + ".tmp")
@@ -40,7 +44,7 @@ class Materializer:
 
         # Write files into tmp_dir
         self._write_skill_md(tmp_dir, clusters)
-        self._write_short_docs_db(tmp_dir, docs)
+        self._write_short_docs_db(tmp_dir, docs, short_doc_texts or {})
         self._write_cluster_indexes(tmp_dir, clusters, docs)
 
         # Preserve pageindex_cache from current compiled_library/
@@ -95,18 +99,26 @@ class Materializer:
             lines.append("")
         (tmp_dir / "SKILL.md").write_text("\n".join(lines), encoding="utf-8")
 
-    def _write_short_docs_db(self, tmp_dir: Path, docs: list[dict[str, Any]]) -> None:
-        """Write short_docs_db.json for short docs with full text content."""
-        short_docs = {
-            doc["id"]: {
+    def _write_short_docs_db(
+        self,
+        tmp_dir: Path,
+        docs: list[dict[str, Any]],
+        short_doc_texts: dict[str, str],
+    ) -> None:
+        """Write short_docs_db.json with full text content."""
+        short_docs = {}
+        for doc in docs:
+            if doc["tier"] != "short" or doc["status"] not in ("embedded", "compiled"):
+                continue
+            content = short_doc_texts.get(doc["id"], "")
+            if not content:
+                continue
+            short_docs[doc["id"]] = {
                 "doc_id": doc["id"],
                 "title": doc["title"],
                 "source_path": doc["source_path"],
-                "content": doc.get("full_text", ""),
+                "content": content,
             }
-            for doc in docs
-            if doc["tier"] == "short" and doc["status"] in ("embedded", "compiled")
-        }
         if short_docs:
             (tmp_dir / "short_docs_db.json").write_text(
                 json.dumps(short_docs, ensure_ascii=False, indent=2),

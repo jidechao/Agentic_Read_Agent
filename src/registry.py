@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS documents (
     embedding     BLOB,
     pageindex_id  TEXT,
     source_page_hint TEXT,
-    full_text     TEXT,
     error_message TEXT,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -128,7 +127,6 @@ class KnowledgeRegistry:
         pageindex_id: str | None = None,
         error_message: str | None = None,
         title: str | None = None,
-        full_text: str | None = None,
     ) -> None:
         """Update the status and optional fields of a document."""
         set_clauses: list[str] = ["status = ?", "updated_at = ?"]
@@ -144,7 +142,6 @@ class KnowledgeRegistry:
             "pageindex_id": pageindex_id,
             "error_message": error_message,
             "title": title,
-            "full_text": full_text,
         }
         for col, val in optional.items():
             if val is not None:
