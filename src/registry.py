@@ -126,6 +126,7 @@ class KnowledgeRegistry:
         has_structure: bool | None = None,
         pageindex_id: str | None = None,
         error_message: str | None = None,
+        title: str | None = None,
     ) -> None:
         """Update the status and optional fields of a document."""
         set_clauses: list[str] = ["status = ?", "updated_at = ?"]
@@ -140,6 +141,7 @@ class KnowledgeRegistry:
             "has_structure": has_structure,
             "pageindex_id": pageindex_id,
             "error_message": error_message,
+            "title": title,
         }
         for col, val in optional.items():
             if val is not None:
