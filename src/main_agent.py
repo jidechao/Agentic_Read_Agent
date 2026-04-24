@@ -181,7 +181,7 @@ agent = Agent(
 
 async def query_agent(prompt: str) -> str:
     """执行一次 Agent 查询，流式输出到终端。"""
-    streamed_run = Runner.run_streamed(agent, prompt, max_turns=10)
+    streamed_run = Runner.run_streamed(agent, prompt, max_turns=20)
 
     async for event in streamed_run.stream_events():
         try:

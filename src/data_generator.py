@@ -1,67 +1,59 @@
-"""生成测试数据：4 篇短文档 + 1 篇长文档。
-短文档存为 data/short_docs.json，长文档存为 data/travel_policy_2026.md。"""
-import json
+"""生成测试数据：短文档 markdown + 长文档 markdown。"""
 from pathlib import Path
+
 import src.config as cfg
 
 
-def generate_short_docs() -> list[dict]:
-    """生成 4 篇短文档，涵盖 IT 和 HR 政策。"""
-    return [
-        {
-            "doc_id": "doc_001",
-            "title": "IT 设备申请流程",
-            "content": (
-                "所有员工如需申请新的办公设备（包括笔记本电脑、显示器、键盘鼠标等），"
-                "须通过 OA 系统提交「IT 设备申请单」。申请需经直属上级审批后，"
-                "由 IT 部门统一采购。标准配置笔记本电脑的审批周期为 3-5 个工作日。"
-                "紧急需求可联系 IT 服务热线 8888 加急处理。设备到货后需在 IT 资产管理系统中登记，"
-                "员工离职时须归还所有 IT 资产。"
-            ),
-        },
-        {
-            "doc_id": "doc_002",
-            "title": "VPN 远程接入指南",
-            "content": (
-                "公司提供 VPN 服务供员工远程办公使用。首次使用请按以下步骤操作：\n"
-                "1. 从内网下载 VPN 客户端安装包（支持 Windows/macOS）\n"
-                "2. 使用工号和域密码登录\n"
-                "3. 选择「默认」连接配置\n"
-                "4. 连接成功后可访问内网资源\n"
-                "注意：VPN 连接后不可同时使用公司 Wi-Fi，否则会造成网络冲突。"
-                "如遇连接问题请联系 IT 服务台。每日 VPN 使用时长限制为 10 小时。"
-            ),
-        },
-        {
-            "doc_id": "doc_003",
-            "title": "出差住宿标准",
-            "content": (
-                "根据公司差旅管理制度，员工出差住宿标准如下：\n"
-                "- 一线城市（北京、上海、广州、深圳）：标准间不超过 600 元/晚\n"
-                "- 二线城市：标准间不超过 400 元/晚\n"
-                "- 三线及以下城市：标准间不超过 300 元/晚\n"
-                "- 管理层（总监及以上）可在上述标准基础上上浮 50%\n"
-                "住宿发票须注明入住人姓名和入住日期，退房时主动索取。"
-                "超标部分需提前申请特殊审批，未经批准的超标费用不予报销。"
-            ),
-        },
-        {
-            "doc_id": "doc_004",
-            "title": "年度体检安排",
-            "content": (
-                "公司每年为全体在职员工安排一次免费健康体检。体检安排如下：\n"
-                "- 体检时间：每年 4 月至 6 月\n"
-                "- 体检机构：美年大健康（全国连锁）\n"
-                "- 预约方式：通过 HR 系统在线预约\n"
-                "- 体检前一天 22:00 后禁食禁水\n"
-                "- 体检报告于检查后 7 个工作日内在 HR 系统查看\n"
-                "员工可根据自身需求自费加选体检项目。未在规定时间内完成体检视为放弃该年度权益。"
-            ),
-        },
-    ]
+SHORT_DOCS: dict[str, str] = {
+    "it_equipment.md": """\
+# IT 设备申请流程
+
+所有员工如需申请新的办公设备（包括笔记本电脑、显示器、键盘鼠标等），须通过 OA 系统提交「IT 设备申请单」。
+
+申请需经直属上级审批后，由 IT 部门统一采购。标准配置笔记本电脑的审批周期为 3-5 个工作日。紧急需求可联系 IT 服务热线 8888 加急处理。设备到货后需在 IT 资产管理系统中登记，员工离职时须归还所有 IT 资产。
+""",
+    "vpn_guide.md": """\
+# VPN 远程接入指南
+
+公司提供 VPN 服务供员工远程办公使用。首次使用请按以下步骤操作：
+
+1. 从内网下载 VPN 客户端安装包（支持 Windows/macOS）
+2. 使用工号和域密码登录
+3. 选择「默认」连接配置
+4. 连接成功后可访问内网资源
+
+注意：VPN 连接后不可同时使用公司 Wi-Fi，否则会造成网络冲突。如遇连接问题请联系 IT 服务台。每日 VPN 使用时长限制为 10 小时。
+""",
+    "accommodation.md": """\
+# 出差住宿标准
+
+根据公司差旅管理制度，员工出差住宿标准如下：
+
+- 一线城市（北京、上海、广州、深圳）：标准间不超过 600 元/晚
+- 二线城市：标准间不超过 400 元/晚
+- 三线及以下城市：标准间不超过 300 元/晚
+- 管理层（总监及以上）可在上述标准基础上上浮 50%
+
+住宿发票须注明入住人姓名和入住日期，退房时主动索取。超标部分需提前申请特殊审批，未经批准的超标费用不予报销。
+""",
+    "health_check.md": """\
+# 年度体检安排
+
+公司每年为全体在职员工安排一次免费健康体检。体检安排如下：
+
+- 体检时间：每年 4 月至 6 月
+- 体检机构：美年大健康（全国连锁）
+- 预约方式：通过 HR 系统在线预约
+- 体检前一天 22:00 后禁食禁水
+- 体检报告于检查后 7 个工作日内在 HR 系统查看
+
+员工可根据自身需求自费加选体检项目。未在规定时间内完成体检视为放弃该年度权益。
+""",
+}
 
 
-LONG_DOC_CONTENT = """# 2026年公司差旅报销政策
+LONG_DOC_CONTENT = """\
+# 2026年公司差旅报销政策
 
 ## 第一章 总则
 
@@ -162,29 +154,19 @@ LONG_DOC_CONTENT = """# 2026年公司差旅报销政策
 """
 
 
-def generate_long_doc() -> None:
-    """生成长文档 travel_policy_2026.md。"""
-    output_path = cfg.DATA_DIR / "travel_policy_2026.md"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(LONG_DOC_CONTENT, encoding="utf-8")
-    print(f"已生成长文档: {output_path}")
+def generate_all() -> None:
+    """生成所有测试数据（短文档 md + 长文档 md）。"""
+    cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    for name, content in SHORT_DOCS.items():
+        path = cfg.DATA_DIR / name
+        path.write_text(content, encoding="utf-8")
 
-def generate_all() -> dict:
-    """生成所有测试数据，返回短文档 dict。"""
-    # 短文档
-    short_docs = generate_short_docs()
-    short_path = cfg.DATA_DIR / "short_docs.json"
-    short_path.parent.mkdir(parents=True, exist_ok=True)
-    short_path.write_text(
-        json.dumps(short_docs, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    print(f"已生成短文档: {short_path} ({len(short_docs)} 篇)")
+    print(f"已生成短文档: {len(SHORT_DOCS)} 篇 markdown")
 
-    # 长文档
-    generate_long_doc()
-
-    return {"short_docs": short_docs}
+    long_path = cfg.DATA_DIR / "travel_policy_2026.md"
+    long_path.write_text(LONG_DOC_CONTENT, encoding="utf-8")
+    print(f"已生成长文档: {long_path}")
 
 
 if __name__ == "__main__":
