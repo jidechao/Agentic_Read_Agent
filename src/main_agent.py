@@ -51,15 +51,10 @@ pageindex_client = PageIndexClient(
     model=cfg.PAGEINDEX_MODEL,
 )
 
-# 3) 初始化知识库注册表（如果存在）
+# 3) 知识库注册表（用于 get_document_source 查询来源信息）
 _knowledge_registry: KnowledgeRegistry | None = None
 if cfg.KNOWLEDGE_DB.exists():
     _knowledge_registry = KnowledgeRegistry(cfg.KNOWLEDGE_DB)
-
-# 4) 加载短文档库
-_short_docs_db: dict = {}
-if cfg.SHORT_DOCS_DB.exists():
-    _short_docs_db = json.loads(cfg.SHORT_DOCS_DB.read_text(encoding="utf-8"))
 
 
 # ── 工具定义 ────────────────────────────────────────────────────────────
@@ -82,32 +77,15 @@ def read_library_directory(path: str) -> str:
 @function_tool
 def get_short_document(doc_id: str) -> str:
     """从短文档库获取指定文档的完整内容。
-    doc_id: 文档ID，如 'doc_001'。
+    doc_id: 文档ID。
     """
-    # 优先从 SQLite 查询
-    if _knowledge_registry:
-        doc = _knowledge_registry.get_document(doc_id)
-        if doc and doc.get("tier") == "short":
-            # 尝试从 compiled_library/short_docs_db.json 读取完整内容
-            db_path = cfg.COMPILED_DIR / "short_docs_db.json"
-            if db_path.exists():
-                db = json.loads(db_path.read_text(encoding="utf-8"))
-                entry = db.get(doc_id)
-                if entry:
-                    return json.dumps(entry, ensure_ascii=False)
-            # 降级：返回注册表中的基本信息
-            return json.dumps({
-                "doc_id": doc["id"],
-                "title": doc["title"],
-                "source_path": doc["source_path"],
-                "status": doc["status"],
-            }, ensure_ascii=False)
-    # 降级到 JSON 文件（向后兼容）
-    doc = _short_docs_db.get(doc_id)
-    if not doc:
-        available = ", ".join(_short_docs_db.keys()) if _short_docs_db else "无"
-        return f"错误：未找到文档 {doc_id}。可用文档: {available}"
-    return json.dumps(doc, ensure_ascii=False)
+    db_path = cfg.COMPILED_DIR / "short_docs_db.json"
+    if db_path.exists():
+        db = json.loads(db_path.read_text(encoding="utf-8"))
+        entry = db.get(doc_id)
+        if entry:
+            return json.dumps(entry, ensure_ascii=False)
+    return f"错误：未找到短文档 {doc_id}"
 
 
 @function_tool
