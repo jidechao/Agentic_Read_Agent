@@ -23,7 +23,7 @@ from agents import (
     set_tracing_disabled,
     set_default_openai_client,
 )
-from agents.models import OpenAIChatCompletionsModel
+from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 
 import src.config as cfg
 
