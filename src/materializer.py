@@ -20,6 +20,7 @@ class Materializer:
         compile_run_id: int,
         registry: Any,
         short_doc_texts: dict[str, str] | None = None,
+        doc_summaries: dict[str, str] | None = None,
     ) -> None:
         """Atomically write compiled_library/ output.
 
@@ -27,6 +28,7 @@ class Materializer:
             compile_run_id: The compile run to materialize.
             registry: Knowledge registry for document/cluster queries.
             short_doc_texts: Mapping of doc_id → full text for short documents.
+            doc_summaries: Mapping of doc_id → content summary for INDEX.md enrichment.
         """
         compiled_dir = cfg.COMPILED_DIR
         tmp_dir = compiled_dir.parent / (compiled_dir.name + ".tmp")
@@ -41,11 +43,12 @@ class Materializer:
         # Gather data from registry
         docs = registry.list_documents()
         clusters = self._get_clusters(registry, compile_run_id)
+        summaries = doc_summaries or {}
 
         # Write files into tmp_dir
-        self._write_skill_md(tmp_dir, clusters)
+        self._write_skill_md(tmp_dir, clusters, summaries, docs)
         self._write_short_docs_db(tmp_dir, docs, short_doc_texts or {})
-        self._write_cluster_indexes(tmp_dir, clusters, docs)
+        self._write_cluster_indexes(tmp_dir, clusters, docs, summaries)
 
         # Preserve pageindex_cache from current compiled_library/
         pi_cache = compiled_dir / "pageindex_cache"
@@ -90,12 +93,27 @@ class Materializer:
 
         return list(clusters_map.values())
 
-    def _write_skill_md(self, tmp_dir: Path, clusters: list[dict[str, Any]]) -> None:
-        """Write SKILL.md top-level directory index."""
+    def _write_skill_md(
+        self,
+        tmp_dir: Path,
+        clusters: list[dict[str, Any]],
+        doc_summaries: dict[str, str],
+        docs: list[dict[str, Any]],
+    ) -> None:
+        """Write SKILL.md top-level directory index with doc titles for quick scanning."""
+        docs_by_id = {doc["id"]: doc for doc in docs}
         lines = ["# 知识库总目录", ""]
         for cluster in clusters:
             lines.append(f"## [{cluster['name']}]({cluster['name']}/INDEX.md)")
             lines.append(cluster["description"])
+            # Collect doc titles for quick relevance filtering
+            titles = []
+            for doc_id in cluster["doc_ids"]:
+                doc = docs_by_id.get(doc_id)
+                if doc and doc.get("title"):
+                    titles.append(doc["title"])
+            if titles:
+                lines.append("包含文档：" + "、".join(titles))
             lines.append("")
         (tmp_dir / "SKILL.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -130,8 +148,9 @@ class Materializer:
         tmp_dir: Path,
         clusters: list[dict[str, Any]],
         docs: list[dict[str, Any]],
+        doc_summaries: dict[str, str],
     ) -> None:
-        """Write INDEX.md for each cluster with source info, grouped by tier."""
+        """Write INDEX.md for each cluster with summaries for fast relevance checking."""
         docs_by_id = {doc["id"]: doc for doc in docs}
 
         for cluster in clusters:
@@ -140,7 +159,6 @@ class Materializer:
 
             lines = [f"# {cluster['name']}", ""]
 
-            # Separate short and long docs for clear navigation
             short_docs = []
             long_docs = []
             for doc_id in cluster["doc_ids"]:
@@ -156,8 +174,10 @@ class Materializer:
                 lines.append("## 短文档（直接检索）")
                 for doc in short_docs:
                     source = f" (来源: {doc['source_path']})" if doc.get("source_path") else ""
+                    summary = doc_summaries.get(doc["id"], "")
+                    summary_line = f"\n  > {summary}" if summary else ""
                     lines.append(
-                        f"- {doc['id']}: {doc.get('title', '未命名')}{source}"
+                        f"- {doc['id']}: {doc.get('title', '未命名')}{source}{summary_line}"
                     )
                 lines.append("")
 
@@ -166,9 +186,11 @@ class Materializer:
                 for doc in long_docs:
                     pid = doc.get("pageindex_id") or doc["id"]
                     pi_note = ", PageIndex索引" if doc.get("pageindex_id") else ""
+                    summary = doc_summaries.get(doc["id"], "")
+                    summary_line = f"\n  > {summary}" if summary else ""
                     lines.append(
                         f"- {pid}: {doc.get('title', '未命名')}"
-                        f" (来源: {doc.get('source_path', '')}{pi_note})"
+                        f" (来源: {doc.get('source_path', '')}{pi_note}){summary_line}"
                     )
                 lines.append("")
 

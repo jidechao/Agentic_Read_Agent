@@ -85,6 +85,7 @@ class KnowledgeCompiler:
             base_url=cfg.SILICONFLOW_BASE_URL,
         )
         self._short_doc_texts: dict[str, str] = {}  # doc_id → full text
+        self._doc_summaries: dict[str, str] = {}  # doc_id → content summary
 
     # ── Main entry point ──────────────────────────────────────────────────
 
@@ -114,7 +115,8 @@ class KnowledgeCompiler:
                 # Atomically materialize compiled_library/
                 from src.materializer import Materializer
                 Materializer().materialize(
-                    run_id, self.registry, self._short_doc_texts
+                    run_id, self.registry, self._short_doc_texts,
+                    self._doc_summaries,
                 )
 
             self.registry.complete_compile_run(
@@ -213,6 +215,9 @@ class KnowledgeCompiler:
             if tier == "short":
                 self._short_doc_texts[doc_id] = result.text
 
+            # Build summary for INDEX.md enrichment (all docs)
+            self._doc_summaries[doc_id] = self._build_summary(result)
+
             # Embed (with cache check) — use title + headings for focused semantics
             cached = self.registry.get_embedding(doc_id)
             if cached is None:
@@ -247,6 +252,28 @@ class KnowledgeCompiler:
         if body:
             parts.append(body)
         return " ".join(parts) if parts else result.text[:500]
+
+    @staticmethod
+    def _build_summary(result: IngestResult, max_chars: int = 120) -> str:
+        """Build a short content summary from ingester data for INDEX.md.
+
+        Pure extraction (no LLM calls): heading texts + first body line.
+        """
+        parts = []
+        # Heading texts = key topics
+        if result.headings:
+            heading_texts = [h.text.strip() for h in result.headings if h.text.strip()]
+            if heading_texts:
+                parts.append("、".join(heading_texts[:6]))
+        # First meaningful body line for domain vocabulary
+        for line in result.text.split("\n"):
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and len(stripped) > 5:
+                if len(stripped) > max_chars:
+                    stripped = stripped[:max_chars] + "..."
+                parts.append(stripped)
+                break
+        return " | ".join(parts) if parts else result.text[:max_chars]
 
     # ── Embedding API (with retry) ────────────────────────────────────────
 
