@@ -145,7 +145,12 @@ class DocumentIngester:
                                 headings.append(Heading(level=1, text=span_text))
 
             full_text = "\n".join(text_parts)
-            title = headings[0].text if headings else file_path.stem
+            # Pick first heading with actual text content (skip emoji-only)
+            title = file_path.stem
+            for h in headings:
+                if h.text and any(c.isalnum() or '\u4e00' <= c <= '\u9fff' for c in h.text):
+                    title = h.text
+                    break
 
             return IngestResult(
                 text=full_text,
