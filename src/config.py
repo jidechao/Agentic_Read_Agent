@@ -35,7 +35,7 @@ SHORT_DOCS_DB: Path = COMPILED_DIR / "short_docs_db.json"
 SKILL_MD: Path = COMPILED_DIR / "SKILL.md"
 
 # ── 聚类配置 ──────────────────────────────────────────────────────────
-CLUSTER_K: int = 2
+CLUSTER_K: int = int(os.environ.get("CLUSTER_K", "0"))  # 0 = auto (sqrt(n/2))
 LONG_DOC_SUMMARY_LENGTH: int = 500  # 长文档聚类摘要截取字数
 
 # ── 自动分类器配置 ──────────────────────────────────────────────────────

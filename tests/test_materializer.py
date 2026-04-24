@@ -68,7 +68,7 @@ def test_materialize_creates_skill_md(tmp_env):
 
 
 def test_materialize_creates_index_md(tmp_env):
-    """INDEX.md per cluster with source info."""
+    """INDEX.md per cluster with source info, grouped by tier."""
     compiled_dir, registry = tmp_env
     run_id, short_texts = _setup_docs_and_clusters(registry)
 
@@ -78,13 +78,13 @@ def test_materialize_creates_index_md(tmp_env):
     it_index = compiled_dir / "it-hr" / "INDEX.md"
     assert it_index.exists()
     content = it_index.read_text(encoding="utf-8")
-    assert "[短文档]" in content
+    assert "## 短文档" in content
     assert "来源" in content
 
     travel_index = compiled_dir / "travel" / "INDEX.md"
     assert travel_index.exists()
     content = travel_index.read_text(encoding="utf-8")
-    assert "[长文档]" in content
+    assert "## 长文档" in content
     assert "uuid-abc-123" in content
 
 

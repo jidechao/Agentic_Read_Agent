@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 from openai import OpenAI
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 import src.config as cfg
 from src.classifier import DocumentClassifier
@@ -212,10 +213,11 @@ class KnowledgeCompiler:
             if tier == "short":
                 self._short_doc_texts[doc_id] = result.text
 
-            # Embed (with cache check)
+            # Embed (with cache check) — use title + headings for focused semantics
             cached = self.registry.get_embedding(doc_id)
             if cached is None:
-                vectors = self._get_embeddings([result.text])
+                embed_text = self._build_embed_text(result)
+                vectors = self._get_embeddings([embed_text])
                 self.registry.cache_embedding(doc_id, vectors[0])
 
             # If long, index via PageIndex
@@ -225,6 +227,26 @@ class KnowledgeCompiler:
             self.registry.update_document_status(doc_id, "embedded")
         except Exception as e:
             self.registry.update_document_status(doc_id, "error", error_message=str(e))
+
+    # ── Embedding helpers ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_embed_text(result: IngestResult) -> str:
+        """Build embedding input: title + headings + content excerpt.
+
+        Title and headings give topic structure, content excerpt adds
+        domain-specific vocabulary for better cluster separation.
+        """
+        parts = []
+        if result.title:
+            parts.append(result.title)
+        if result.headings:
+            parts.extend(h.text for h in result.headings if h.text.strip())
+        # Add first ~300 chars of body for domain vocabulary
+        body = result.text[:300].strip()
+        if body:
+            parts.append(body)
+        return " ".join(parts) if parts else result.text[:500]
 
     # ── Embedding API (with retry) ────────────────────────────────────────
 
@@ -251,7 +273,11 @@ class KnowledgeCompiler:
     # ── Clustering ────────────────────────────────────────────────────────
 
     def _compile_clusters(self, run_id: int) -> int:
-        """KMeans clustering + LLM naming. Returns number of clusters."""
+        """KMeans clustering + LLM naming. Returns number of clusters.
+
+        Uses title+heading embeddings (focused semantics) with auto-K
+        selection via silhouette score.
+        """
         docs = self.registry.list_documents(status="embedded")
         if not docs:
             return 0
@@ -264,12 +290,15 @@ class KnowledgeCompiler:
                 vectors.append(emb)
                 doc_ids.append(doc["id"])
 
-        if len(vectors) < 2:
+        n = len(vectors)
+        if n < 2:
             return 0
 
-        k = cfg.CLUSTER_K or max(1, round(math.sqrt(len(vectors) / 2)))
+        matrix = np.array(vectors)
+        k = self._find_optimal_k(matrix, n)
+        print(f"自动选择 K={k} (共 {n} 个文档)")
         kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        labels = kmeans.fit_predict(np.array(vectors))
+        labels = kmeans.fit_predict(matrix)
 
         clusters = []
         for cluster_id in range(k):
@@ -285,6 +314,43 @@ class KnowledgeCompiler:
 
         self.registry.save_clusters(clusters, run_id)
         return len(clusters)
+
+    @staticmethod
+    def _find_optimal_k(matrix: np.ndarray, n: int) -> int:
+        """Find optimal K via silhouette score with granularity guard.
+
+        When all scores are low (embeddings are close), prefer more clusters
+        to avoid dumping unrelated docs into the same group.
+        """
+        if n <= 2:
+            return 2
+        max_k = min(n - 1, max(2, int(math.sqrt(n) * 2)))
+        if max_k < 2:
+            return 2
+
+        scores: dict[int, float] = {}
+        for k in range(2, max_k + 1):
+            km = KMeans(n_clusters=k, random_state=42, n_init=10)
+            labels = km.fit_predict(matrix)
+            if len(set(labels)) < 2:
+                continue
+            scores[k] = float(silhouette_score(matrix, labels))
+
+        if not scores:
+            return 2
+
+        best_k = max(scores, key=scores.get)
+        best_score = scores[best_k]
+
+        # Granularity guard: if best score is low, embeddings are too similar.
+        # Prefer finer granularity so each cluster is smaller and more focused.
+        if best_score < 0.15:
+            threshold = best_score * 0.8
+            for k in sorted(scores.keys(), reverse=True):
+                if scores[k] >= threshold:
+                    return k
+
+        return best_k
 
     def _name_cluster(self, doc_titles: list[str]) -> tuple[str, str]:
         """Call LLM to name a cluster based on its document titles."""

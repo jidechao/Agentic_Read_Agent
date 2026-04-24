@@ -131,7 +131,7 @@ class Materializer:
         clusters: list[dict[str, Any]],
         docs: list[dict[str, Any]],
     ) -> None:
-        """Write INDEX.md for each cluster with source info."""
+        """Write INDEX.md for each cluster with source info, grouped by tier."""
         docs_by_id = {doc["id"]: doc for doc in docs}
 
         for cluster in clusters:
@@ -139,22 +139,38 @@ class Materializer:
             cluster_dir.mkdir(parents=True, exist_ok=True)
 
             lines = [f"# {cluster['name']}", ""]
+
+            # Separate short and long docs for clear navigation
+            short_docs = []
+            long_docs = []
             for doc_id in cluster["doc_ids"]:
                 doc = docs_by_id.get(doc_id)
                 if not doc:
                     continue
-                source = f" (来源: {doc['source_path']})" if doc.get("source_path") else ""
                 if doc["tier"] == "short":
-                    lines.append(
-                        f"- [短文档] {doc_id}: {doc.get('title', '未命名')}{source}"
-                    )
+                    short_docs.append(doc)
                 else:
-                    pid = doc.get("pageindex_id") or doc_id
+                    long_docs.append(doc)
+
+            if short_docs:
+                lines.append("## 短文档（直接检索）")
+                for doc in short_docs:
+                    source = f" (来源: {doc['source_path']})" if doc.get("source_path") else ""
+                    lines.append(
+                        f"- {doc['id']}: {doc.get('title', '未命名')}{source}"
+                    )
+                lines.append("")
+
+            if long_docs:
+                lines.append("## 长文档（PageIndex 导航）")
+                for doc in long_docs:
+                    pid = doc.get("pageindex_id") or doc["id"]
                     pi_note = ", PageIndex索引" if doc.get("pageindex_id") else ""
                     lines.append(
-                        f"- [长文档] {pid}: {doc.get('title', '未命名')}"
+                        f"- {pid}: {doc.get('title', '未命名')}"
                         f" (来源: {doc.get('source_path', '')}{pi_note})"
                     )
+                lines.append("")
 
             (cluster_dir / "INDEX.md").write_text(
                 "\n".join(lines) + "\n", encoding="utf-8"
