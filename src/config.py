@@ -37,3 +37,12 @@ SKILL_MD: Path = COMPILED_DIR / "SKILL.md"
 # ── 聚类配置 ──────────────────────────────────────────────────────────
 CLUSTER_K: int = 2
 LONG_DOC_SUMMARY_LENGTH: int = 500  # 长文档聚类摘要截取字数
+
+# ── 自动分类器配置 ──────────────────────────────────────────────────────
+CLASSIFIER_TOKEN_THRESHOLD: int = int(os.environ.get("CLASSIFIER_TOKEN_THRESHOLD", "1000"))
+CLASSIFIER_STRUCTURE_WEIGHT: float = float(os.environ.get("CLASSIFIER_STRUCTURE_WEIGHT", "0.4"))
+CLASSIFIER_LENGTH_WEIGHT: float = float(os.environ.get("CLASSIFIER_LENGTH_WEIGHT", "0.6"))
+CLASSIFIER_USE_EXACT_TOKENS: bool = os.environ.get("CLASSIFIER_USE_EXACT_TOKENS", "false").lower() == "true"
+
+# ── 注册表路径 ──────────────────────────────────────────────────────────
+KNOWLEDGE_DB: Path = PROJECT_ROOT / "knowledge.db"
