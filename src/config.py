@@ -22,7 +22,7 @@ SILICONFLOW_BASE_URL: str = "https://api.siliconflow.cn/v1"
 # ── 模型配置（可热换）──────────────────────────────────────────────────
 EMBEDDING_MODEL: str = "Qwen/Qwen3-Embedding-4B"
 EMBEDDING_DIMENSION: int = 1536
-AGENT_MODEL: str = "Qwen/Qwen3-32B"
+AGENT_MODEL: str = "Qwen/Qwen3-30B-A3B-Instruct-2507"
 CLUSTER_NAMING_MODEL: str = "Qwen/Qwen3-8B"
 PAGEINDEX_MODEL: str = "Qwen/Qwen3-8B"
 

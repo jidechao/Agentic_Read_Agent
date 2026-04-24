@@ -139,23 +139,26 @@ agent = Agent(
 
 async def query_agent(prompt: str) -> str:
     """执行一次 Agent 查询，流式输出到终端。"""
-    streamed_run = Runner.run_streamed(agent, prompt)
+    streamed_run = Runner.run_streamed(agent, prompt, max_turns=10)
 
     async for event in streamed_run.stream_events():
-        # 处理原始响应事件（文本流）
-        if event.type == "raw_response_event":
-            if isinstance(event.data, ResponseTextDeltaEvent):
-                print(event.data.delta, end="", flush=True)
+        try:
+            # 处理原始响应事件（文本流）
+            if event.type == "raw_response_event":
+                if isinstance(event.data, ResponseTextDeltaEvent):
+                    print(event.data.delta, end="", flush=True)
 
-        # 处理高级生命周期事件（工具调用等）
-        elif event.type == "run_item_stream_event":
-            if event.item.type == "tool_call_item":
-                raw = event.item.raw_item
-                print(f"\n[tool call]: {raw.name}({getattr(raw, 'arguments', '{}')})", flush=True)
-            elif event.item.type == "tool_call_output_item":
-                output = str(event.item.output)
-                preview = output[:200] + "..." if len(output) > 200 else output
-                print(f"\n[tool call output]: {preview}", flush=True)
+            # 处理高级生命周期事件（工具调用等）
+            elif event.type == "run_item_stream_event":
+                if event.item.type == "tool_call_item":
+                    raw = event.item.raw_item
+                    print(f"\n[tool call]: {raw.name}({getattr(raw, 'arguments', '{}')})", flush=True)
+                elif event.item.type == "tool_call_output_item":
+                    output = str(event.item.output)
+                    preview = output[:200] + "..." if len(output) > 200 else output
+                    print(f"\n[tool call output]: {preview}", flush=True)
+        except Exception as e:
+            logger.warning("事件处理异常: %s", e)
 
     print()  # 末尾换行
     return streamed_run.final_output or ""
