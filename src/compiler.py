@@ -87,12 +87,15 @@ class KnowledgeCompiler:
     # ── Main entry point ──────────────────────────────────────────────────
 
     def compile(
-        self, trigger_type: str = "manual", force: bool = False
+        self,
+        trigger_type: str = "manual",
+        force: bool = False,
+        data_dir: Path | None = None,
     ) -> CompileResult:
         """Run a full compile cycle: scan, process, cluster."""
         run_id = self.registry.create_compile_run(trigger_type)
         try:
-            changes = self.scan_data_dir(force)
+            changes = self.scan_data_dir(force, data_dir=data_dir)
 
             for fi in changes["to_process"]:
                 self.process_document(fi)

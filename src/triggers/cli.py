@@ -16,6 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     # compile
     p_compile = sub.add_parser("compile", help="编译知识库")
     p_compile.add_argument("--force", action="store_true", help="强制全量重编译")
+    p_compile.add_argument("--data-dir", type=str, help="源文档目录（默认 data/）")
     p_compile.add_argument("--verbose", "-v", action="store_true")
 
     # status
@@ -45,10 +46,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.command == "compile":
+        data_dir = Path(args.data_dir) if args.data_dir else None
         registry = KnowledgeRegistry(cfg.KNOWLEDGE_DB)
         try:
             compiler = KnowledgeCompiler(registry=registry)
-            result = compiler.compile(trigger_type="manual", force=args.force)
+            result = compiler.compile(
+                trigger_type="manual", force=args.force, data_dir=data_dir
+            )
             print(f"编译完成: 处理 {result.docs_processed}, 跳过 {result.docs_skipped}, 删除 {result.docs_deleted}")
         finally:
             registry.close()
