@@ -1,0 +1,297 @@
+"""SQLite-backed document registry with embedding cache and compile-run tracking."""
+from __future__ import annotations
+
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS documents (
+    id            TEXT PRIMARY KEY,
+    source_path   TEXT NOT NULL,
+    format        TEXT NOT NULL,
+    title         TEXT,
+    content_hash  TEXT NOT NULL,
+    tier          TEXT CHECK(tier IN ('short', 'long', 'unclassified')) DEFAULT 'unclassified',
+    status        TEXT CHECK(status IN ('ingested', 'classified', 'embedded', 'compiled', 'error')) DEFAULT 'ingested',
+    token_count   INTEGER,
+    has_structure BOOLEAN DEFAULT FALSE,
+    embedding     BLOB,
+    pageindex_id  TEXT,
+    source_page_hint TEXT,
+    error_message TEXT,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS compile_runs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_type    TEXT,
+    started_at      DATETIME NOT NULL,
+    completed_at    DATETIME,
+    status          TEXT CHECK(status IN ('running', 'completed', 'failed')) DEFAULT 'running',
+    docs_processed  INTEGER DEFAULT 0,
+    docs_skipped    INTEGER DEFAULT 0,
+    error_message   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS clusters (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    description   TEXT,
+    compile_run_id INTEGER REFERENCES compile_runs(id)
+);
+
+CREATE TABLE IF NOT EXISTS document_clusters (
+    doc_id      TEXT REFERENCES documents(id),
+    cluster_id  INTEGER REFERENCES clusters(id),
+    PRIMARY KEY (doc_id, cluster_id)
+);
+"""
+
+
+_BOOL_COLUMNS = {"has_structure"}
+
+
+def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    """Convert a sqlite3.Row to a plain dict, or return None."""
+    if row is None:
+        return None
+    d = dict(row)
+    for col in _BOOL_COLUMNS:
+        if col in d and d[col] is not None:
+            d[col] = bool(d[col])
+    return d
+
+
+class KnowledgeRegistry:
+    """Manages document state, embedding cache, and compile runs in SQLite."""
+
+    def __init__(self, db_path: Path) -> None:
+        self._db_path = db_path
+        self._conn: sqlite3.Connection | None = None
+
+    def _get_conn(self) -> sqlite3.Connection:
+        """Return a lazily-initialised connection with tables created."""
+        if self._conn is None:
+            self._conn = sqlite3.connect(str(self._db_path))
+            self._conn.row_factory = sqlite3.Row
+            self._conn.executescript(SCHEMA)
+        return self._conn
+
+    def close(self) -> None:
+        """Close the database connection."""
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+
+    # ── Document CRUD ──────────────────────────────────────────────────
+
+    def register_document(
+        self,
+        source_path: str,
+        format: str,
+        content_hash: str,
+        title: str | None = None,
+    ) -> str:
+        """Insert a new document and return its generated id."""
+        doc_id = str(uuid.uuid4())
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO documents (id, source_path, format, content_hash, title)
+               VALUES (?, ?, ?, ?, ?)""",
+            (doc_id, source_path, format, content_hash, title),
+        )
+        conn.commit()
+        return doc_id
+
+    def get_document(self, doc_id: str) -> dict[str, Any] | None:
+        """Return a document dict by id, or None if not found."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        return _row_to_dict(row)
+
+    def update_document_status(
+        self,
+        doc_id: str,
+        status: str,
+        tier: str | None = None,
+        token_count: int | None = None,
+        has_structure: bool | None = None,
+        pageindex_id: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        """Update the status and optional fields of a document."""
+        set_clauses: list[str] = ["status = ?", "updated_at = ?"]
+        values: list[Any] = [
+            status,
+            datetime.now(timezone.utc).isoformat(),
+        ]
+
+        optional: dict[str, Any] = {
+            "tier": tier,
+            "token_count": token_count,
+            "has_structure": has_structure,
+            "pageindex_id": pageindex_id,
+            "error_message": error_message,
+        }
+        for col, val in optional.items():
+            if val is not None:
+                set_clauses.append(f"{col} = ?")
+                values.append(val)
+
+        values.append(doc_id)
+        conn = self._get_conn()
+        conn.execute(
+            f"UPDATE documents SET {', '.join(set_clauses)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+
+    def delete_document(self, doc_id: str) -> None:
+        """Delete a document and its cluster associations."""
+        conn = self._get_conn()
+        conn.execute(
+            "DELETE FROM document_clusters WHERE doc_id = ?", (doc_id,)
+        )
+        conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        conn.commit()
+
+    def find_by_hash(self, content_hash: str) -> dict[str, Any] | None:
+        """Find a document by its content hash."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM documents WHERE content_hash = ?",
+            (content_hash,),
+        ).fetchone()
+        return _row_to_dict(row)
+
+    def list_documents(
+        self,
+        status: str | None = None,
+        tier: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List documents, optionally filtered by status and/or tier."""
+        clauses: list[str] = []
+        values: list[Any] = []
+        if status is not None:
+            clauses.append("status = ?")
+            values.append(status)
+        if tier is not None:
+            clauses.append("tier = ?")
+            values.append(tier)
+
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        conn = self._get_conn()
+        rows = conn.execute(
+            f"SELECT * FROM documents{where}", values
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]  # type: ignore[misc]
+
+    # ── Embedding cache ────────────────────────────────────────────────
+
+    def cache_embedding(self, doc_id: str, vector: np.ndarray) -> None:
+        """Store a numpy embedding vector as a BLOB."""
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE documents SET embedding = ? WHERE id = ?",
+            (vector.astype(np.float32).tobytes(), doc_id),
+        )
+        conn.commit()
+
+    def get_embedding(self, doc_id: str) -> np.ndarray | None:
+        """Retrieve the stored embedding vector, or None."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT embedding FROM documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        if row is None or row["embedding"] is None:
+            return None
+        return np.frombuffer(row["embedding"], dtype=np.float32).copy()
+
+    # ── Compile runs ───────────────────────────────────────────────────
+
+    def create_compile_run(self, trigger_type: str) -> int:
+        """Create a new compile run record and return its id."""
+        conn = self._get_conn()
+        cursor = conn.execute(
+            """INSERT INTO compile_runs (trigger_type, started_at)
+               VALUES (?, ?)""",
+            (trigger_type, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+    def get_compile_run(self, run_id: int) -> dict[str, Any] | None:
+        """Return a compile run dict by id."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM compile_runs WHERE id = ?", (run_id,)
+        ).fetchone()
+        return _row_to_dict(row)
+
+    def complete_compile_run(
+        self,
+        run_id: int,
+        docs_processed: int = 0,
+        docs_skipped: int = 0,
+        error_message: str | None = None,
+    ) -> None:
+        """Mark a compile run as completed with stats."""
+        conn = self._get_conn()
+        conn.execute(
+            """UPDATE compile_runs
+               SET status = 'completed',
+                   completed_at = ?,
+                   docs_processed = ?,
+                   docs_skipped = ?,
+                   error_message = ?
+               WHERE id = ?""",
+            (
+                datetime.now(timezone.utc).isoformat(),
+                docs_processed,
+                docs_skipped,
+                error_message,
+                run_id,
+            ),
+        )
+        conn.commit()
+
+    # ── Clusters ───────────────────────────────────────────────────────
+
+    def save_clusters(
+        self,
+        clusters: list[dict[str, Any]],
+        compile_run_id: int,
+    ) -> list[int]:
+        """Persist clusters and their document linkages. Return cluster ids."""
+        conn = self._get_conn()
+        cluster_ids: list[int] = []
+        for cluster in clusters:
+            cursor = conn.execute(
+                """INSERT INTO clusters (name, description, compile_run_id)
+                   VALUES (?, ?, ?)""",
+                (
+                    cluster["name"],
+                    cluster.get("description"),
+                    compile_run_id,
+                ),
+            )
+            cid = cursor.lastrowid
+            assert cid is not None
+            cluster_ids.append(cid)
+
+            for doc_id in cluster.get("doc_ids", []):
+                conn.execute(
+                    """INSERT INTO document_clusters (doc_id, cluster_id)
+                       VALUES (?, ?)""",
+                    (doc_id, cid),
+                )
+        conn.commit()
+        return cluster_ids
