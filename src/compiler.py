@@ -82,6 +82,9 @@ class KnowledgeCompiler:
                 # Promote all embedded docs to compiled status
                 for doc in self.registry.list_documents(status="embedded"):
                     self.registry.update_document_status(doc["id"], "compiled")
+                # Atomically materialize compiled_library/
+                from src.materializer import Materializer
+                Materializer().materialize(run_id, self.registry)
 
             self.registry.complete_compile_run(
                 run_id,
