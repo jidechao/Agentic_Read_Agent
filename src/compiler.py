@@ -196,6 +196,8 @@ class KnowledgeCompiler:
             tier = self.classifier.classify(result)
             tokens = self.classifier.estimate_tokens(result.text)
             has_structure = len(result.headings) >= 2
+            # Store full text for short docs (used by Agent retrieval)
+            full_text = result.text if tier == "short" else None
             self.registry.update_document_status(
                 doc_id,
                 "classified",
@@ -203,6 +205,7 @@ class KnowledgeCompiler:
                 token_count=tokens,
                 has_structure=has_structure,
                 title=result.title,
+                full_text=full_text,
             )
 
             # Embed (with cache check)

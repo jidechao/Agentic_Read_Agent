@@ -96,12 +96,13 @@ class Materializer:
         (tmp_dir / "SKILL.md").write_text("\n".join(lines), encoding="utf-8")
 
     def _write_short_docs_db(self, tmp_dir: Path, docs: list[dict[str, Any]]) -> None:
-        """Write short_docs_db.json for short docs."""
+        """Write short_docs_db.json for short docs with full text content."""
         short_docs = {
             doc["id"]: {
                 "doc_id": doc["id"],
                 "title": doc["title"],
                 "source_path": doc["source_path"],
+                "content": doc.get("full_text", ""),
             }
             for doc in docs
             if doc["tier"] == "short" and doc["status"] in ("embedded", "compiled")
