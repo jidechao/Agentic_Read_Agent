@@ -174,6 +174,15 @@ class KnowledgeRegistry:
         ).fetchone()
         return _row_to_dict(row)
 
+    def find_by_pageindex_id(self, pageindex_id: str) -> dict[str, Any] | None:
+        """Find a document by its PageIndex ID."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM documents WHERE pageindex_id = ?",
+            (pageindex_id,),
+        ).fetchone()
+        return _row_to_dict(row)
+
     def list_documents(
         self,
         status: str | None = None,

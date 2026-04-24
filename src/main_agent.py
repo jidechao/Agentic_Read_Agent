@@ -119,11 +119,14 @@ def read_long_document_section(doc_id: str, section_id: str) -> str:
 @function_tool
 def get_document_source(doc_id: str) -> str:
     """查询文档的原始来源信息（文件路径、格式、页码提示）。
-    doc_id: 文档ID。
+    doc_id: 文档ID（支持 registry ID 或 PageIndex ID）。
     """
     if not _knowledge_registry:
         return "知识库注册表未初始化，无法查询来源信息。"
     doc = _knowledge_registry.get_document(doc_id)
+    # Fallback: try pageindex_id column (INDEX.md shows pageindex_id for long docs)
+    if not doc:
+        doc = _knowledge_registry.find_by_pageindex_id(doc_id)
     if not doc:
         return f"错误：未找到文档 {doc_id}"
     info = {
