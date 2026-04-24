@@ -122,6 +122,28 @@ class DocumentIngester:
 
     # ── PDF ───────────────────────────────────────────────────────────────
 
+    # Font-size → heading level thresholds for PDF parsing.
+    _FONT_LEVEL_MAP: list[tuple[float, int]] = [
+        (22.0, 1),  # title-level
+        (14.5, 2),  # section-level
+        (12.5, 3),  # subsection-level
+    ]
+
+    @staticmethod
+    def _is_meaningful_heading(text: str) -> bool:
+        """Check if heading text has enough semantic content (not just emoji/symbols/digits)."""
+        cjk = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        alpha = sum(1 for c in text if c.isalpha())
+        # Allow 2+ CJK or 2+ alpha (covers "IT", "HR", "VPN", etc.)
+        return cjk >= 2 or alpha >= 2
+
+    def _font_size_to_level(self, size: float) -> int | None:
+        """Map font size to heading level (1-3), or None if body text."""
+        for threshold, level in self._FONT_LEVEL_MAP:
+            if size >= threshold:
+                return level
+        return None
+
     def _parse_pdf(self, file_path: Path) -> IngestResult:
         """Parse a PDF file into IngestResult using PyMuPDF."""
         doc = fitz.open(str(file_path))
@@ -141,14 +163,14 @@ class DocumentIngester:
                                 continue
                             text_parts.append(span_text)
                             font_size = span.get("size", 0)
-                            if font_size > 14:
-                                headings.append(Heading(level=1, text=span_text))
+                            level = self._font_size_to_level(font_size)
+                            if level is not None and self._is_meaningful_heading(span_text):
+                                headings.append(Heading(level=level, text=span_text))
 
             full_text = "\n".join(text_parts)
-            # Pick first heading with actual text content (skip emoji-only)
             title = file_path.stem
             for h in headings:
-                if h.text and any(c.isalnum() or '\u4e00' <= c <= '\u9fff' for c in h.text):
+                if h.level == 1:
                     title = h.text
                     break
 

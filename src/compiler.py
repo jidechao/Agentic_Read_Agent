@@ -23,6 +23,30 @@ from src.ingester import DocumentIngester, IngestResult
 from src.registry import KnowledgeRegistry
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────
+
+
+def _normalize_ws(text: str) -> str:
+    """Collapse consecutive whitespace and strip for fuzzy matching."""
+    import re
+
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _find_heading(
+    lookup: list[tuple[str, int, str]],
+    counters: dict[str, int],
+    norm_text: str,
+) -> tuple[int, str] | None:
+    """Find the next matching heading entry, advancing counter for duplicates."""
+    idx = counters.get(norm_text, 0)
+    for i in range(idx, len(lookup)):
+        if lookup[i][0] == norm_text:
+            counters[norm_text] = i + 1
+            return lookup[i][1], lookup[i][2]
+    return None
+
+
 # ── Data classes ──────────────────────────────────────────────────────────
 
 
@@ -294,14 +318,15 @@ class KnowledgeCompiler:
             workspace=cfg.PAGEINDEX_WORKSPACE, model=litellm_model
         )
 
-        # For non-md files, write text to a temporary .md file
         if file_path.suffix.lower() not in (".md", ".markdown"):
+            # Non-md: reconstruct markdown with heading markers from ingester
             import tempfile
 
+            md_content = self._reconstruct_markdown(result)
             with tempfile.NamedTemporaryFile(
                 suffix=".md", mode="w", encoding="utf-8", delete=False
             ) as tmp:
-                tmp.write(result.text)
+                tmp.write(md_content)
                 tmp_path = tmp.name
             try:
                 pageindex_id = pi_client.index(tmp_path, mode="md")
@@ -313,3 +338,36 @@ class KnowledgeCompiler:
         self.registry.update_document_status(
             doc_id, "embedded", pageindex_id=pageindex_id
         )
+
+    @staticmethod
+    def _reconstruct_markdown(result: IngestResult) -> str:
+        """Reconstruct proper markdown from ingester result.
+        Inserts heading markers so PageIndex can build a tree structure.
+        """
+        if not result.headings:
+            # No headings detected — wrap entire text as one section
+            return f"# {result.title}\n\n{result.text}"
+
+        # Build normalized lookup: (normalized_text -> level)
+        # Use list of tuples to handle duplicate heading texts correctly
+        heading_lookup: list[tuple[str, int, str]] = [
+            (_normalize_ws(h.text), h.level, h.text) for h in result.headings
+        ]
+        # Track next heading index for each normalized text to handle duplicates
+        heading_counters: dict[str, int] = {}
+
+        lines = result.text.split("\n")
+        output_lines = [f"# {result.title}", ""]
+        for line in lines:
+            stripped = line.strip()
+            norm = _normalize_ws(stripped)
+            # Find matching heading by normalized text, respecting order for duplicates
+            match = _find_heading(heading_lookup, heading_counters, norm)
+            if match is not None:
+                level, original_text = match
+                prefix = "#" * level
+                output_lines.append(f"{prefix} {original_text}")
+            else:
+                output_lines.append(line)
+
+        return "\n".join(output_lines)
