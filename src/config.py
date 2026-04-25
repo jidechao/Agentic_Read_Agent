@@ -44,6 +44,8 @@ PENDING_REVIEW_REBALANCE_RATIO: float = float(os.environ.get("PENDING_REVIEW_REB
 PENDING_REVIEW_REBALANCE_ABSOLUTE: int = int(os.environ.get("PENDING_REVIEW_REBALANCE_ABSOLUTE", "30"))
 LLM_SUMMARY_MAX_CHARS: int = int(os.environ.get("LLM_SUMMARY_MAX_CHARS", "80"))
 TOPIC_SUMMARY_MODEL: str = os.environ.get("TOPIC_SUMMARY_MODEL", CLUSTER_NAMING_MODEL)
+CATEGORY_REUSE_THRESHOLD: float = float(os.environ.get("CATEGORY_REUSE_THRESHOLD", "0.65"))
+PENDING_REVIEW_REBALANCE_MIN: int = int(os.environ.get("PENDING_REVIEW_REBALANCE_MIN", "5"))
 
 # ── 自动分类器配置 ──────────────────────────────────────────────────────
 CLASSIFIER_TOKEN_THRESHOLD: int = int(os.environ.get("CLASSIFIER_TOKEN_THRESHOLD", "1000"))

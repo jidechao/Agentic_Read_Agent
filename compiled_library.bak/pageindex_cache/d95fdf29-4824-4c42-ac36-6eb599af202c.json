@@ -1,0 +1,225 @@
+{
+  "id": "d95fdf29-4824-4c42-ac36-6eb599af202c",
+  "type": "md",
+  "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpfovrgozp.md",
+  "doc_name": "tmpfovrgozp",
+  "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的阅读与检索行为，实现对长篇专业文档（如财务报告、法律文件）的高精度、类人化信息提取，无需依赖向量数据库或文本分块，支持本地自托管与云端API部署，并在FinanceBench基准测试中达到98.7%的准确率。",
+  "line_count": 375,
+  "structure": [
+    {
+      "title": "PageIndex",
+      "node_id": "0000",
+      "line_num": 1,
+      "text": "# PageIndex\n\nGITHUB TRENDING\n#1 Repository Of The Day\n1\n基于推理的\nRAG\n✧\n无需向量数据库\n✧\n无需文本分块\n✧\n类人检索\n🏠\n主页\n•\n🖥️\n仪表板\n•\n🔌\nMCP\n•\n📚\n文档\n•\n💬\nDiscord\n•\n✉️",
+      "nodes": [
+        {
+          "title": "联系我们",
+          "node_id": "0001",
+          "line_num": 30,
+          "text": "## 联系我们\n🚨\n新版本发布\n:\nPageIndex MCP\n将",
+          "summary": "## 联系我们\n🚨\n新版本发布\n:\nPageIndex MCP\n将"
+        }
+      ],
+      "prefix_summary": "# PageIndex\n\nGITHUB TRENDING\n#1 Repository Of The Day\n1\n基于推理的\nRAG\n✧\n无需向量数据库\n✧\n无需文本分块\n✧\n类人检索\n🏠\n主页\n•\n🖥️\n仪表板\n•\n🔌\nMCP\n•\n📚\n文档\n•\n💬\nDiscord\n•\n✉️"
+    },
+    {
+      "title": "PageIndex",
+      "node_id": "0002",
+      "line_num": 36,
+      "text": "# PageIndex\n引入\nClaude\n、\nCursor\n及任何支持\nMCP\n的智能体。以类人的、基于推理的方式与长\n篇",
+      "nodes": [
+        {
+          "title": "PDF",
+          "node_id": "0003",
+          "line_num": 45,
+          "text": "## PDF\n对话\n📖\n📄",
+          "summary": "## PDF\n对话\n📖\n📄"
+        }
+      ],
+      "prefix_summary": "# PageIndex\n引入\nClaude\n、\nCursor\n及任何支持\nMCP\n的智能体。以类人的、基于推理的方式与长\n篇"
+    },
+    {
+      "title": "PageIndex",
+      "node_id": "0004",
+      "line_num": 49,
+      "text": "# PageIndex",
+      "summary": "# PageIndex"
+    },
+    {
+      "title": "简介",
+      "node_id": "0005",
+      "line_num": 50,
+      "text": "# 简介\n您是否对长篇幅专业文档的向量数据库检索准确率感到沮丧？传统的基于向量的\nRAG\n依赖语义相\n似性而非真正的相关性。但\n相似性\n≠\n相关性\n——\n我们在检索中真正需要的是\n相关性\n，而这需要\n推理\n。在处理需要领域专业知识和多步推理的专业文档时，相似性搜索往往表现不佳。\n受\nAlphaGo\n启发，我们提出了",
+      "nodes": [
+        {
+          "title": "PageIndex",
+          "node_id": "0006",
+          "line_num": 67,
+          "text": "## PageIndex\n，一个\n基于推理的\nRAG\n系统，它通过\n树搜索\n模拟\n人类\n专家\n如何浏览和从长文档中提取知识，使\nLLM\n能够通过思考和推理找到最相关的文档部分。它通\n过两个步骤执行检索：\n1.\n为文档生成一个\n\"\n目录\n\"\n树结构索引\n2.\n通过\n树搜索\n执行基于推理的检索\n💡",
+          "summary": "## PageIndex\n，一个\n基于推理的\nRAG\n系统，它通过\n树搜索\n模拟\n人类\n专家\n如何浏览和从长文档中提取知识，使\nLLM\n能够通过思考和推理找到最相关的文档部分。它通\n过两个步骤执行检索：\n1.\n为文档生成一个\n\"\n目录\n\"\n树结构索引\n2.\n通过\n树搜索\n执行基于推理的检索\n💡"
+        },
+        {
+          "title": "特性",
+          "node_id": "0007",
+          "line_num": 91,
+          "text": "## 特性\n与传统基于向量的\nRAG\n相比，",
+          "summary": "## 特性\n与传统基于向量的\nRAG\n相比，"
+        }
+      ],
+      "prefix_summary": "# 简介\n您是否对长篇幅专业文档的向量数据库检索准确率感到沮丧？传统的基于向量的\nRAG\n依赖语义相\n似性而非真正的相关性。但\n相似性\n≠\n相关性\n——\n我们在检索中真正需要的是\n相关性\n，而这需要\n推理\n。在处理需要领域专业知识和多步推理的专业文档时，相似性搜索往往表现不佳。\n受\nAlphaGo\n启发，我们提出了"
+    },
+    {
+      "title": "PageIndex",
+      "node_id": "0008",
+      "line_num": 95,
+      "text": "# PageIndex\n具有以下特点：\n无需向量\n：利用文档结构和\nLLM\n推理进行检索。\n无需分块\n：文档按自然章节组织，而非人工分块。\n类人检索\n：模拟人类专家如何浏览和从复杂文档中提取知识。\n透明的检索过程\n：基于推理的检索\n——\n告别近似的向量搜索（\n\"\n氛围检索\n\"\n）。\nPageIndex\n驱动的基于推理的\nRAG\n系统在",
+      "summary": "# PageIndex\n具有以下特点：\n无需向量\n：利用文档结构和\nLLM\n推理进行检索。\n无需分块\n：文档按自然章节组织，而非人工分块。\n类人检索\n：模拟人类专家如何浏览和从复杂文档中提取知识。\n透明的检索过程\n：基于推理的检索\n——\n告别近似的向量搜索（\n\"\n氛围检索\n\"\n）。\nPageIndex\n驱动的基于推理的\nRAG\n系统在"
+    },
+    {
+      "title": "FinanceBench",
+      "node_id": "0009",
+      "line_num": 117,
+      "text": "# FinanceBench\n上达到了\n98.7%\n的准确率\n，在专业文档\n分析中展现了最先进的性能（详见我们的\n博客文章\n）。\n🚀",
+      "nodes": [
+        {
+          "title": "部署选项",
+          "node_id": "0010",
+          "line_num": 126,
+          "text": "## 部署选项\n🛠️\n自托管\n—\n使用此开源仓库在本地运行\n☁️\n云服务\n—\n通过我们的\n🖥️\n仪表板\n或\n🔌\nAPI\n即时试用，无需设置\n⚡",
+          "summary": "## 部署选项\n🛠️\n自托管\n—\n使用此开源仓库在本地运行\n☁️\n云服务\n—\n通过我们的\n🖥️\n仪表板\n或\n🔌\nAPI\n即时试用，无需设置\n⚡"
+        },
+        {
+          "title": "快速上手",
+          "node_id": "0011",
+          "line_num": 142,
+          "text": "## 快速上手\n查看这个简单的\n无向量\nRAG\n笔记本\n—\n一个使用\nPageIndex\n的最小化、可动手实践的、基于推理\n的\nRAG\n流水线。\n在\nCOLAB\n中打开",
+          "summary": "## 快速上手\n查看这个简单的\n无向量\nRAG\n笔记本\n—\n一个使用\nPageIndex\n的最小化、可动手实践的、基于推理\n的\nRAG\n流水线。\n在\nCOLAB\n中打开"
+        }
+      ],
+      "prefix_summary": "# FinanceBench\n上达到了\n98.7%\n的准确率\n，在专业文档\n分析中展现了最先进的性能（详见我们的\n博客文章\n）。\n🚀"
+    },
+    {
+      "title": "使用",
+      "node_id": "0012",
+      "line_num": 157,
+      "text": "# 使用\nPAGEINDEX\n的无向量\nRAG\n📦\nPageIndex",
+      "summary": "# 使用\nPAGEINDEX\n的无向量\nRAG\n📦\nPageIndex"
+    },
+    {
+      "title": "树结构",
+      "node_id": "0013",
+      "line_num": 163,
+      "text": "# 树结构\nPageIndex\n可以将冗长的\nPDF\n文档转换为语义\n树结构\n，类似于\n_\"\n目录\n\"_\n，但针对大型语言模型的\n使用进行了优化。它非常适用于：财务报告、监管文件、学术教科书、法律或技术手册，以及任\n何超出\nLLM\n上下文限制的文档。\n以下是一个输出示例。查看更多\n示例文档\n和\n生成的树结构\n。\n...\n{\n\"title\": \"\n金融稳定\n\",\n\"node_id\": \"0006\",\n\"start_index\": 21,\n\"end_index\": 22,\n\"summary\": \"\n美联储\n...\",\n\"nodes\": [\n{\n\"title\": \"\n监测金融脆弱性\n\",\n\"node_id\": \"0007\",\n\"start_index\": 22,\n\"end_index\": 28,\n\"summary\": \"\n美联储的监测\n...\"\n},\n{\n\"title\": \"\n国内与国际合作与协调\n\",\n\"node_id\": \"0008\",\n\"start_index\": 28,\n\"end_index\": 31,\n\"summary\": \"2023\n年，美联储协作\n...\"\n}\n]\n}\n...\n您可以使用此开源仓库生成\nPageIndex\n树结构，或者试用我们的\n☁️\n云服务\n—\n通过我们的\n🖥️\n仪\n表板\n或\n🔌\nAPI\n即时访问，无需设置。\n🚀",
+      "summary": "该部分文档主要介绍了“树结构”在处理长篇PDF文档中的应用，强调其将复杂文档转化为语义树结构的功能，类似于优化后的目录，特别适用于财务报告、监管文件、学术教科书、法律和技术手册等超长文档。文档说明该结构针对大型语言模型（LLM）的使用进行了优化，可有效突破LLM的上下文限制。通过示例展示了树结构的层级组织形式，包括标题、节点ID、索引范围和摘要信息。最后，文档提供两种使用方式：通过开源仓库自行生成，或使用云端服务（通过仪表板或API）快速访问，无需额外配置。"
+    },
+    {
+      "title": "包使用",
+      "node_id": "0014",
+      "line_num": 235,
+      "text": "# 包使用\n您可以按照以下步骤从\nPDF\n文档生成\nPageIndex\n树。\n1.",
+      "nodes": [
+        {
+          "title": "安装依赖",
+          "node_id": "0015",
+          "line_num": 242,
+          "text": "## 安装依赖\npip3\ninstall\n--upgrade -r requirements.txt\n2.",
+          "summary": "## 安装依赖\npip3\ninstall\n--upgrade -r requirements.txt\n2."
+        },
+        {
+          "title": "设置您的",
+          "node_id": "0016",
+          "line_num": 247,
+          "text": "## 设置您的",
+          "summary": "## 设置您的"
+        },
+        {
+          "title": "OpenAI API",
+          "node_id": "0017",
+          "line_num": 248,
+          "text": "## OpenAI API",
+          "summary": "## OpenAI API"
+        },
+        {
+          "title": "密钥",
+          "node_id": "0018",
+          "line_num": 249,
+          "text": "## 密钥\n在根目录创建一个\n.env\n文件并添加您的\nAPI\n密钥：\nCHATGPT_API_KEY\n=\n您的\n_openai_\n密钥\n_\n在此\n3.",
+          "summary": "## 密钥\n在根目录创建一个\n.env\n文件并添加您的\nAPI\n密钥：\nCHATGPT_API_KEY\n=\n您的\n_openai_\n密钥\n_\n在此\n3."
+        },
+        {
+          "title": "在您的",
+          "node_id": "0019",
+          "line_num": 263,
+          "text": "## 在您的\nPDF",
+          "summary": "## 在您的\nPDF"
+        },
+        {
+          "title": "上运行",
+          "node_id": "0020",
+          "line_num": 265,
+          "text": "## 上运行\nPageIndex\npython3 run_pageindex.py --pdf_path /path/to/your/document.pdf\n可选参数\nMarkdown\n支持\n☁️\n使用",
+          "summary": "## 上运行\nPageIndex\npython3 run_pageindex.py --pdf_path /path/to/your/document.pdf\n可选参数\nMarkdown\n支持\n☁️\n使用"
+        }
+      ],
+      "prefix_summary": "# 包使用\n您可以按照以下步骤从\nPDF\n文档生成\nPageIndex\n树。\n1."
+    },
+    {
+      "title": "PageIndex OCR",
+      "node_id": "0021",
+      "line_num": 273,
+      "text": "# PageIndex OCR",
+      "summary": "# PageIndex OCR"
+    },
+    {
+      "title": "改进树生成",
+      "node_id": "0022",
+      "line_num": 274,
+      "text": "# 改进树生成\n此仓库旨在为简单的\nPDF\n生成\nPageIndex\n树结构，但许多实际用例涉及复杂的\nPDF\n，这些\nPDF\n很难通过经典的\nPython\n工具解析。然而，从\nPDF\n文档中提取高质量文本仍然是一个不小的挑\n战。大多数\nOCR\n工具仅提取页面级内容，丢失了更广泛的文档上下文和层次结构。\n为了解决这个问题，我们推出了\nPageIndex OCR ——\n第一个旨在保留文档全局结构的长上下文\nOCR\n模型。在识别跨文档页面的真实层次结构和语义关系方面，\nPageIndex OCR\n显著优于其他领\n先的\nOCR\n工具，例如\nMistral\n和\nContextual AI\n的工具。\n在我们的\n仪表板\n上体验\nPageIndex OCR\n的下一代\nOCR\n质量。\n通过我们的\nAPI\n将\nPageIndex OCR\n无缝集成到您的技术栈中。\n📈",
+      "summary": "该部分文档介绍了“改进树生成”仓库的目标和核心功能，重点在于解决复杂PDF文档中高质量文本提取的挑战。传统Python工具和OCR技术通常只能提取页面级内容，缺乏对文档整体结构和语义关系的把握。为此，项目推出了PageIndex OCR，作为首个专注于保留文档全局结构的长上下文OCR模型，能够更准确地识别跨页面的层次结构和语义关联，显著优于Mistral和Contextual AI等领先工具。文档还提到可通过仪表板体验其OCR性能，并通过API将其集成到现有技术栈中。"
+    },
+    {
+      "title": "案例研究：",
+      "node_id": "0023",
+      "line_num": 318,
+      "text": "# 案例研究：\nFinanceBench",
+      "summary": "# 案例研究：\nFinanceBench"
+    },
+    {
+      "title": "上的",
+      "node_id": "0024",
+      "line_num": 320,
+      "text": "# 上的",
+      "summary": "# 上的"
+    },
+    {
+      "title": "Mafin 2.5",
+      "node_id": "0025",
+      "line_num": 321,
+      "text": "# Mafin 2.5\nMafin 2.5\n是一个最先进的、基于推理的\nRAG\n模型，专为金融文档分析设计。由\nPageIndex\n驱\n动，它在\nFinanceBench\n基准测试中达到了市场领先的\n98.7%\n准确率\n——\n显著优于传统的基于向\n量的\nRAG\n系统。\nPageIndex\n的分层索引使得能够从复杂的财务报告（如\nSEC\n文件和收益披露）中精确导航和提取\n相关内容。\n👉\n查看完整的\n基准测试结果\n和我们的\n博客文章\n以获取详细的比较和性能指标。\n🔎",
+      "summary": "该部分文档介绍了Mafin 2.5，一个专为金融文档分析设计的先进基于推理的RAG模型。其核心特点包括：采用PageIndex驱动的分层索引技术，能够精准定位和提取复杂财务报告（如SEC文件和收益披露）中的相关信息；在FinanceBench基准测试中达到98.7%的准确率，显著优于传统向量驱动的RAG系统；文档还提及可查看完整的基准测试结果和博客文章以获取性能比较详情。"
+    },
+    {
+      "title": "了解更多关于",
+      "node_id": "0026",
+      "line_num": 350,
+      "text": "# 了解更多关于\nPageIndex",
+      "nodes": [
+        {
+          "title": "资源与指南",
+          "node_id": "0027",
+          "line_num": 352,
+          "text": "## 资源与指南\n📖\n探索我们的\n教程\n获取实用指南和策略，包括文档搜索和树搜索。\n🧪\n浏览\nCookbook\n获取实用方法和高级用例。\n⚙️\n参考\nAPI\n文档\n了解集成细节和配置选项。\n⭐",
+          "summary": "## 资源与指南\n📖\n探索我们的\n教程\n获取实用指南和策略，包括文档搜索和树搜索。\n🧪\n浏览\nCookbook\n获取实用方法和高级用例。\n⚙️\n参考\nAPI\n文档\n了解集成细节和配置选项。\n⭐"
+        },
+        {
+          "title": "支持我们",
+          "node_id": "0028",
+          "line_num": 367,
+          "text": "## 支持我们\n如果您喜欢我们的项目，请给我们一个星标。谢谢！\n联系我们\nTWITTER\nLINKEDIN\nDISCORD\n联系我们\n© 2025\nVectify AI",
+          "summary": "## 支持我们\n如果您喜欢我们的项目，请给我们一个星标。谢谢！\n联系我们\nTWITTER\nLINKEDIN\nDISCORD\n联系我们\n© 2025\nVectify AI"
+        }
+      ],
+      "prefix_summary": "# 了解更多关于\nPageIndex"
+    }
+  ]
+}

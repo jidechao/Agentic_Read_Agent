@@ -49,6 +49,34 @@ def test_scan_detects_new_files(tmp_env):
     assert len(changes.deleted) == 0
 
 
+def test_force_compile_preserves_categories_until_rebuild(tmp_env, monkeypatch):
+    """Force compile must let _compile_clusters snapshot old category names first."""
+    compiler, data_dir, registry = tmp_env
+    _create_file(data_dir, "doc.md", "# Hello")
+    registry.upsert_category(
+        "annual-health-check",
+        "年度体检",
+        "旧描述",
+        np.array([1.0, 0.0], dtype=np.float32),
+        doc_count=1,
+    )
+
+    monkeypatch.setattr(compiler, "process_document", lambda _fi: None)
+
+    def fake_compile_clusters(run_id):
+        assert run_id > 0
+        assert [c["canonical_name"] for c in registry.list_categories()] == [
+            "annual-health-check"
+        ]
+        return 1
+
+    monkeypatch.setattr(compiler, "_compile_clusters", fake_compile_clusters)
+
+    result = compiler.compile(force=True, data_dir=data_dir)
+
+    assert result.clusters_created == 1
+
+
 def test_scan_returns_scan_result(tmp_env):
     """scan_data_dir returns a ScanResult dataclass, not a plain dict."""
     compiler, data_dir, _ = tmp_env

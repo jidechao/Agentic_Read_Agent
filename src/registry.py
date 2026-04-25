@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -118,6 +119,7 @@ class KnowledgeRegistry:
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
+        self._in_transaction: bool = False
 
     def _get_conn(self) -> sqlite3.Connection:
         """Return a lazily-initialised connection with tables created."""
@@ -132,6 +134,32 @@ class KnowledgeRegistry:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
+
+    def _commit(self) -> None:
+        """Commit unless an explicit transaction owns the connection."""
+        if self._in_transaction:
+            return
+        self._get_conn().commit()
+
+    @contextmanager
+    def transaction(self):
+        """Group mutations so failures roll back atomically."""
+        if self._in_transaction:
+            yield
+            return
+
+        conn = self._get_conn()
+        conn.execute("BEGIN IMMEDIATE")
+        self._in_transaction = True
+        try:
+            yield
+        except Exception:
+            conn.rollback()
+            raise
+        else:
+            conn.commit()
+        finally:
+            self._in_transaction = False
 
     # ── Document CRUD ──────────────────────────────────────────────────
 
@@ -150,7 +178,7 @@ class KnowledgeRegistry:
                VALUES (?, ?, ?, ?, ?)""",
             (doc_id, source_path, format, content_hash, title),
         )
-        conn.commit()
+        self._commit()
         return doc_id
 
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
@@ -198,7 +226,7 @@ class KnowledgeRegistry:
             f"UPDATE documents SET {', '.join(set_clauses)} WHERE id = ?",
             values,
         )
-        conn.commit()
+        self._commit()
 
     def delete_document(self, doc_id: str) -> None:
         """Delete a document and its cluster associations."""
@@ -208,7 +236,7 @@ class KnowledgeRegistry:
         )
         conn.execute("DELETE FROM document_category WHERE doc_id = ?", (doc_id,))
         conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-        conn.commit()
+        self._commit()
 
     def find_by_hash(self, content_hash: str) -> dict[str, Any] | None:
         """Find a document by its content hash."""
@@ -277,7 +305,7 @@ class KnowledgeRegistry:
             "UPDATE documents SET embedding = ? WHERE id = ?",
             (vector.astype(np.float32).tobytes(), doc_id),
         )
-        conn.commit()
+        self._commit()
 
     def get_embedding(self, doc_id: str) -> np.ndarray | None:
         """Retrieve the stored embedding vector, or None."""
@@ -300,7 +328,7 @@ class KnowledgeRegistry:
                ON CONFLICT(content_hash) DO UPDATE SET summary = excluded.summary""",
             (content_hash, summary),
         )
-        conn.commit()
+        self._commit()
 
     def get_topic_summary(self, content_hash: str) -> str | None:
         """Return a cached topic summary by content hash."""
@@ -321,7 +349,7 @@ class KnowledgeRegistry:
                VALUES (?, ?)""",
             (trigger_type, datetime.now(timezone.utc).isoformat()),
         )
-        conn.commit()
+        self._commit()
         return cursor.lastrowid  # type: ignore[return-value]
 
     def get_compile_run(self, run_id: int) -> dict[str, Any] | None:
@@ -357,7 +385,7 @@ class KnowledgeRegistry:
                 run_id,
             ),
         )
-        conn.commit()
+        self._commit()
 
     # ── Clusters ───────────────────────────────────────────────────────
 
@@ -389,7 +417,7 @@ class KnowledgeRegistry:
                        VALUES (?, ?)""",
                     (doc_id, cid),
                 )
-        conn.commit()
+        self._commit()
         return cluster_ids
 
     # ── Stable categories ───────────────────────────────────────────────
@@ -441,7 +469,7 @@ class KnowledgeRegistry:
                     now,
                 ),
             )
-        conn.commit()
+        self._commit()
         return cid
 
     def clear_categories(self) -> None:
@@ -449,7 +477,7 @@ class KnowledgeRegistry:
         conn = self._get_conn()
         conn.execute("DELETE FROM document_category")
         conn.execute("DELETE FROM categories")
-        conn.commit()
+        self._commit()
 
     def list_categories(self) -> list[dict[str, Any]]:
         """Return all stable categories ordered by creation time."""
@@ -494,7 +522,7 @@ class KnowledgeRegistry:
                    confidence = excluded.confidence""",
             (doc_id, category_id, similarity, assigned_by, confidence),
         )
-        conn.commit()
+        self._commit()
 
     def replace_document_category(
         self,
@@ -513,7 +541,7 @@ class KnowledgeRegistry:
                VALUES (?, ?, ?, ?, ?)""",
             (doc_id, category_id, similarity, assigned_by, confidence),
         )
-        conn.commit()
+        self._commit()
 
     def list_category_documents(self, category_id: str) -> list[dict[str, Any]]:
         """Return documents assigned to a category with assignment metadata."""

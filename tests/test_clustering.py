@@ -335,7 +335,52 @@ def test_full_rebuild_preserves_category_id_for_same_canonical_name(
 
     categories = registry.list_categories()
     assert [category["id"] for category in categories] == [existing_id]
-    assert categories[0]["description"] == "新描述"
+    assert categories[0]["description"] == "旧描述"
+
+
+def test_full_rebuild_reuses_category_name_by_document_overlap_without_centroid(
+    registry: KnowledgeRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    doc_id = registry.register_document("health.md", "md", "hash-health", title="年度体检")
+    doc_b = registry.register_document("exam.md", "md", "hash-exam", title="体检通知")
+    vector = l2_normalize(np.array([1.0, 0.0], dtype=np.float32))
+    vector_b = l2_normalize(np.array([0.9, 0.1], dtype=np.float32))
+    registry.update_document_status(doc_id, "embedded", tier="short")
+    registry.update_document_status(doc_b, "embedded", tier="short")
+    registry.cache_embedding(doc_id, vector)
+    registry.cache_embedding(doc_b, vector_b)
+    existing_id = registry.upsert_category(
+        "annual-health-check",
+        "年度体检",
+        "旧体检描述",
+        None,
+        doc_count=2,
+    )
+    registry.assign_document_category(doc_id, existing_id, 1.0, "llm", 1.0)
+    registry.assign_document_category(doc_b, existing_id, 0.9, "llm", 0.9)
+
+    def fake_discover(*_args, **_kwargs):
+        return [
+            DiscoveredCategory(
+                canonical_name="health-check-schedule",
+                display_name="体检安排",
+                description="新体检描述",
+                doc_ids=[doc_id, doc_b],
+                centroid=l2_normalize(np.array([0.95, 0.05], dtype=np.float32)),
+            )
+        ]
+
+    monkeypatch.setattr("src.compiler.discover_categories", fake_discover)
+    compiler = KnowledgeCompiler(registry=registry)
+    run_id = registry.create_compile_run("manual")
+
+    compiler._compile_clusters(run_id)
+
+    categories = registry.list_categories()
+    assert [category["id"] for category in categories] == [existing_id]
+    assert categories[0]["canonical_name"] == "annual-health-check"
+    assert categories[0]["description"] == "旧体检描述"
 
 
 def test_full_rebuild_merges_duplicate_canonical_names(

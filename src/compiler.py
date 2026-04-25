@@ -130,8 +130,6 @@ class KnowledgeCompiler:
                 if self.registry.list_categories() and not force and not changes.deleted:
                     num_clusters = self._incremental_assign_clusters(run_id)
                 else:
-                    if force:
-                        self.registry.clear_categories()
                     num_clusters = self._compile_clusters(run_id)
                 # Promote all embedded docs to compiled status
                 for doc in self.registry.list_documents(status="embedded"):
@@ -439,39 +437,47 @@ class KnowledgeCompiler:
                 doc_ids,
             )
         )
+        discovered = self._reuse_old_category_names(
+            discovered, old_categories, old_by_doc_id
+        )
+        discovered = self._merge_duplicate_discovered_categories(discovered)
 
-        self.registry.clear_categories()
         legacy_clusters: list[dict[str, object]] = []
-        for category in discovered:
-            old_category = old_by_name.get(category.canonical_name)
-            category_id = self.registry.upsert_category(
-                canonical_name=category.canonical_name,
-                display_name=category.display_name,
-                description=category.description,
-                centroid=category.centroid,
-                doc_count=len(category.doc_ids),
-                category_id=old_category["id"] if old_category else None,
-            )
-            for doc_id in category.doc_ids:
-                sim = float(
-                    np.dot(l2_normalize(vectors_by_doc_id[doc_id]), category.centroid)
+        with self.registry.transaction():
+            self.registry.clear_categories()
+            for category in discovered:
+                old_category = old_by_name.get(category.canonical_name)
+                category_id = self.registry.upsert_category(
+                    canonical_name=category.canonical_name,
+                    display_name=category.display_name,
+                    description=category.description,
+                    centroid=category.centroid,
+                    doc_count=len(category.doc_ids),
+                    category_id=old_category["id"] if old_category else None,
                 )
-                self.registry.replace_document_category(
-                    doc_id,
-                    category_id,
-                    similarity=sim,
-                    assigned_by="llm",
-                    confidence=max(0.5, sim),
+                for doc_id in category.doc_ids:
+                    sim = float(
+                        np.dot(
+                            l2_normalize(vectors_by_doc_id[doc_id]),
+                            category.centroid,
+                        )
+                    )
+                    self.registry.replace_document_category(
+                        doc_id,
+                        category_id,
+                        similarity=sim,
+                        assigned_by="llm",
+                        confidence=max(0.5, sim),
+                    )
+                legacy_clusters.append(
+                    {
+                        "name": category.canonical_name,
+                        "description": category.description,
+                        "doc_ids": category.doc_ids,
+                    }
                 )
-            legacy_clusters.append(
-                {
-                    "name": category.canonical_name,
-                    "description": category.description,
-                    "doc_ids": category.doc_ids,
-                }
-            )
 
-        self._merge_singleton_categories()
+        self._merge_singleton_categories(original_categories=old_categories)
         legacy_clusters = [
             {
                 "name": category["canonical_name"],
@@ -483,7 +489,8 @@ class KnowledgeCompiler:
             }
             for category in self.registry.list_categories()
         ]
-        self.registry.save_clusters(legacy_clusters, run_id)
+        with self.registry.transaction():
+            self.registry.save_clusters(legacy_clusters, run_id)
         return len(self.registry.list_categories())
 
     def _incremental_assign_clusters(self, run_id: int) -> int:
@@ -627,15 +634,115 @@ class KnowledgeCompiler:
             )
         return merged
 
+    def _reuse_old_category_names(
+        self,
+        discovered: list[DiscoveredCategory],
+        old_categories: list[dict[str, object]],
+        old_by_doc_id: dict[str, dict[str, object] | None] | None = None,
+    ) -> list[DiscoveredCategory]:
+        """Reuse old category names when centroids still describe the same topic."""
+        if not old_categories or not discovered:
+            return discovered
+
+        result = list(discovered)
+        old_by_name = {
+            str(old["canonical_name"]): old
+            for old in old_categories
+        }
+        used_old: set[str] = set()
+        used_new: set[int] = set()
+
+        for new_idx, category in enumerate(result):
+            old = old_by_name.get(category.canonical_name)
+            if old is None:
+                continue
+            old_id = str(old["id"])
+            used_new.add(new_idx)
+            used_old.add(old_id)
+            result[new_idx] = DiscoveredCategory(
+                canonical_name=str(old["canonical_name"]),
+                display_name=str(old.get("display_name") or old["canonical_name"]),
+                description=str(old.get("description") or category.description),
+                doc_ids=category.doc_ids,
+                centroid=category.centroid,
+            )
+
+        pairs: list[tuple[float, int, dict[str, object]]] = []
+        for new_idx, category in enumerate(result):
+            if new_idx in used_new:
+                continue
+            new_centroid = l2_normalize(category.centroid)
+            for old in old_categories:
+                if str(old["id"]) in used_old:
+                    continue
+                old_centroid = old.get("centroid")
+                if old_centroid is None:
+                    continue
+                sim = float(np.dot(new_centroid, l2_normalize(old_centroid)))
+                pairs.append((sim, new_idx, old))
+        pairs.sort(key=lambda pair: pair[0], reverse=True)
+
+        for sim, new_idx, old in pairs:
+            if sim < cfg.CATEGORY_REUSE_THRESHOLD:
+                break
+            old_id = str(old["id"])
+            if new_idx in used_new or old_id in used_old:
+                continue
+            used_new.add(new_idx)
+            used_old.add(old_id)
+            category = result[new_idx]
+            result[new_idx] = DiscoveredCategory(
+                canonical_name=str(old["canonical_name"]),
+                display_name=str(old.get("display_name") or old["canonical_name"]),
+                description=str(old.get("description") or category.description),
+                doc_ids=category.doc_ids,
+                centroid=category.centroid,
+            )
+
+        if not old_by_doc_id:
+            return result
+
+        for new_idx, category in enumerate(result):
+            if new_idx in used_new:
+                continue
+            counts: dict[str, tuple[int, dict[str, object]]] = {}
+            for doc_id in category.doc_ids:
+                old = old_by_doc_id.get(doc_id)
+                if old is None:
+                    continue
+                old_id = str(old["id"])
+                if old_id in used_old:
+                    continue
+                count, _ = counts.get(old_id, (0, old))
+                counts[old_id] = (count + 1, old)
+            if not counts:
+                continue
+            _, (overlap_count, old) = max(
+                counts.items(), key=lambda item: item[1][0]
+            )
+            if overlap_count / len(category.doc_ids) < 0.5:
+                continue
+            used_new.add(new_idx)
+            used_old.add(str(old["id"]))
+            result[new_idx] = DiscoveredCategory(
+                canonical_name=str(old["canonical_name"]),
+                display_name=str(old.get("display_name") or old["canonical_name"]),
+                description=str(old.get("description") or category.description),
+                doc_ids=category.doc_ids,
+                centroid=category.centroid,
+            )
+        return result
+
     def _pending_requires_rebalance(self, pending_count: int) -> bool:
         """Return whether pending volume should trigger full rebalance."""
         total = len(self._list_clusterable_documents())
         if total == 0:
             return False
-        return (
-            pending_count >= cfg.PENDING_REVIEW_REBALANCE_ABSOLUTE
-            or pending_count / total >= cfg.PENDING_REVIEW_REBALANCE_RATIO
-        )
+        if pending_count >= cfg.PENDING_REVIEW_REBALANCE_ABSOLUTE:
+            return True
+        if pending_count < cfg.PENDING_REVIEW_REBALANCE_MIN:
+            return False
+        return pending_count / total >= cfg.PENDING_REVIEW_REBALANCE_RATIO
 
     def _refresh_category_centroids(self) -> None:
         """Recompute category centroids and doc counts after assignments."""
@@ -656,7 +763,9 @@ class KnowledgeCompiler:
                 category_id=category["id"],
             )
 
-    def _merge_singleton_categories(self) -> None:
+    def _merge_singleton_categories(
+        self, original_categories: list[dict[str, object]] | None = None
+    ) -> None:
         """Merge obvious singleton categories produced by over-fine coarse clustering."""
         categories = self.registry.list_categories()
         docs_by_category = {
@@ -668,8 +777,10 @@ class KnowledgeCompiler:
             return
 
         old_by_id = {category["id"]: category for category in categories}
-        self.registry.clear_categories()
 
+        plans: list[
+            tuple[list[str], list[dict[str, object]], list[np.ndarray], str, str, str]
+        ] = []
         for group in groups:
             docs: list[dict[str, object]] = []
             vectors: list[np.ndarray] = []
@@ -680,37 +791,73 @@ class KnowledgeCompiler:
                     if emb is not None:
                         vectors.append(emb)
 
-            titles = [str(doc.get("title") or doc.get("source_path") or "") for doc in docs]
-            summaries = [self._summary_for_doc(doc) for doc in docs]
-            canonical, display, description = name_category_with_llm(
-                self._sf_client, cfg.CLUSTER_NAMING_MODEL, titles, summaries
-            )
-            if len(group) == 1:
-                original = old_by_id[group[0]]
-                canonical = original["canonical_name"]
-                display = original.get("display_name") or canonical
-                description = original.get("description") or description
+            canonical: str | None = None
+            display: str | None = None
+            description: str | None = None
+            cluster_centroid = centroid(vectors) if vectors else None
 
-            reuse_id = old_by_id[group[0]]["id"]
-            category_id = self.registry.upsert_category(
-                canonical,
-                display,
-                description,
-                centroid(vectors) if vectors else None,
-                doc_count=len(docs),
-                category_id=reuse_id,
-            )
-            for doc in docs:
-                emb = self.registry.get_embedding(doc["id"])
-                center = self.registry.get_category_centroid(category_id)
-                sim = (
-                    float(np.dot(l2_normalize(emb), center))
-                    if emb is not None and center is not None
-                    else 0.0
+            if cluster_centroid is not None and original_categories:
+                best: dict[str, object] | None = None
+                best_sim = -1.0
+                for old in original_categories:
+                    old_centroid = old.get("centroid")
+                    if old_centroid is None:
+                        continue
+                    sim = float(
+                        np.dot(
+                            l2_normalize(cluster_centroid),
+                            l2_normalize(old_centroid),
+                        )
+                    )
+                    if sim > best_sim:
+                        best_sim = sim
+                        best = old
+                if best is not None and best_sim >= cfg.CATEGORY_REUSE_THRESHOLD:
+                    canonical = str(best["canonical_name"])
+                    display = str(best.get("display_name") or canonical)
+                    description = str(best.get("description") or "")
+
+            if canonical is None and len(group) == 1:
+                original = old_by_id[group[0]]
+                canonical = str(original["canonical_name"])
+                display = str(original.get("display_name") or canonical)
+                description = str(original.get("description") or "")
+
+            if canonical is None:
+                titles = [
+                    str(doc.get("title") or doc.get("source_path") or "")
+                    for doc in docs
+                ]
+                summaries = [self._summary_for_doc(doc) for doc in docs]
+                canonical, display, description = name_category_with_llm(
+                    self._sf_client, cfg.CLUSTER_NAMING_MODEL, titles, summaries
                 )
-                self.registry.replace_document_category(
-                    doc["id"], category_id, sim, "llm", max(0.5, sim)
+
+            plans.append((group, docs, vectors, canonical, display, description))
+
+        with self.registry.transaction():
+            self.registry.clear_categories()
+            for group, docs, vectors, canonical, display, description in plans:
+                reuse_id = old_by_id[group[0]]["id"]
+                category_id = self.registry.upsert_category(
+                    canonical,
+                    display,
+                    description,
+                    centroid(vectors) if vectors else None,
+                    doc_count=len(docs),
+                    category_id=reuse_id,
                 )
+                for doc in docs:
+                    emb = self.registry.get_embedding(doc["id"])
+                    center = self.registry.get_category_centroid(category_id)
+                    sim = (
+                        float(np.dot(l2_normalize(emb), center))
+                        if emb is not None and center is not None
+                        else 0.0
+                    )
+                    self.registry.replace_document_category(
+                        doc["id"], category_id, sim, "llm", max(0.5, sim)
+                    )
 
     # ── Long document indexing ────────────────────────────────────────────
 

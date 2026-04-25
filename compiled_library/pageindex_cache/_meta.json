@@ -26,5 +26,166 @@
     "doc_description": "这份文档是面向初次接触 Ralph 的开发者的完整用户指南，详细介绍了如何通过 `prd.json` 驱动自动化开发任务，涵盖从准备项目结构、生成需求文档、配置执行参数到运行与调试的全流程，特别强调了路径 A（仅使用 Ralph CLI）的简单上手方式及路径 B（结合 OpenSpec + Superpowers + Ralph）的完整流水线协作模式，帮助开发者高效落地 AI 驱动的渐进式开发。",
     "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
     "line_count": 708
+  },
+  "09b116f3-13f4-42f7-b441-c0bb3260be79": {
+    "type": "md",
+    "doc_name": "tmptf8fbg8j",
+    "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的文档阅读与知识提取过程，实现对长篇专业文档（如财务报告、法律文件）的高精度、类人检索，无需向量数据库或文本分块，支持自托管与云端API部署，并在FinanceBench基准上达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmptf8fbg8j.md",
+    "line_count": 375
+  },
+  "b57e3c58-57fb-463a-8865-fce0ea2c1942": {
+    "type": "md",
+    "doc_name": "tmpi6zw_ol5",
+    "doc_description": "一个基于推理的RAG系统，通过树搜索和文档结构化索引实现类人检索，无需向量数据库或文本分块，在金融报告等长篇专业文档分析中达到98.7%的准确率，支持本地部署与云端API接入。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpi6zw_ol5.md",
+    "line_count": 375
+  },
+  "b5779861-7890-4129-98a0-dc967c9303ac": {
+    "type": "md",
+    "doc_name": "tmpseou89v5",
+    "doc_description": "该文档为国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，系统规定了电子会计档案的整理、封装、结构格式与数字签名等技术规范，重点构建了基于OPG封装格式的标准化体系，确保电子会计档案的完整性、可读性、安全性和长期可利用性，适用于会计档案的电子化管理与跨系统互操作。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpseou89v5.md",
+    "line_count": 4512
+  },
+  "c52efca5-304d-41dd-9ee7-13061382c128": {
+    "type": "md",
+    "doc_name": "tmpnl_yct35",
+    "doc_description": "该文档为中华人民共和国国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，系统规定了电子会计档案的封装结构、技术格式、安全机制及全生命周期管理要求，重点涵盖封装格式（OPG）、数字签名、元数据完整性、跨平台可读性及与GB/T 25500、GB/T 33190等标准的协同，旨在实现电子会计档案的规范化、可追溯与长期可利用。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpnl_yct35.md",
+    "line_count": 4512
+  },
+  "55923558-e748-4dcf-9be3-648fb13b23c9": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这是一份面向初次接触 Ralph 的开发者的详细用户指南，系统介绍了如何通过 `prd.json` 驱动自动化开发任务，涵盖从准备项目结构、生成需求文档、配置执行参数到运行与调试的完整流程，特别强调了路径 A（仅使用 Ralph CLI）的快速上手方案及路径 B（结合 OpenSpec + Superpowers + Ralph）的完整流水线协作模式。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
+  },
+  "364749c0-ed77-4da2-8b0e-8f24f7e0309a": {
+    "type": "md",
+    "doc_name": "travel_policy_2026",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，旨在规范差旅行为并加强费用管控。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
+    "line_count": 99
+  },
+  "c858a993-9952-4155-af7c-fbc00397b1d7": {
+    "type": "md",
+    "doc_name": "tmp0d2yh_zi",
+    "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的思考过程，实现对长篇专业文档（如财务报告、法律文件）的精准、类人检索，无需向量数据库或文本分块，在FinanceBench基准上达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmp0d2yh_zi.md",
+    "line_count": 375
+  },
+  "1a2cbb5a-7fb4-4a90-a31e-81b3fdc4686e": {
+    "type": "md",
+    "doc_name": "tmp29xv3p8q",
+    "doc_description": "该文档为中华人民共和国国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，系统规定了电子会计档案的整理、封装、格式规范及长期保存技术要求，重点采用OPG开放式封装格式，确保文件完整性、可读性与安全性，适用于电子会计档案的归档、解析与利用，是落实电子凭证报销入账归档政策的核心技术依据。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmp29xv3p8q.md",
+    "line_count": 4512
+  },
+  "50f1eed5-d374-4fcc-bb7d-aea298d5233e": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这份文档是面向初次使用 Ralph 的开发者的完整操作指南，详细介绍了如何通过 `prd.json` 驱动自动化开发流程，涵盖从准备项目结构、生成需求文档、配置执行参数到运行、中断恢复及常见问题排查的全流程，特别区分了仅使用 Ralph CLI 的简化路径与结合 OpenSpec 和 Superpowers 的完整流水线路径，帮助用户高效落地 AI 驱动的开发任务。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
+  },
+  "ef34259d-197f-47f9-af61-d4fa9f42300d": {
+    "type": "md",
+    "doc_name": "travel_policy_2026",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，旨在规范差旅行为并加强费用管控。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
+    "line_count": 99
+  },
+  "9ed66b65-5233-4fc2-b28f-51e5fada94af": {
+    "type": "md",
+    "doc_name": "tmpdn571_nl",
+    "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的思考过程，实现对长篇专业文档（如财务报告、法律文件）的精准、类人检索，无需依赖向量数据库或文本分块，在FinanceBench基准上达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpdn571_nl.md",
+    "line_count": 375
+  },
+  "3fc2d87c-589b-47ec-94cd-3a302f40a9d6": {
+    "type": "md",
+    "doc_name": "tmp8sz37qn_",
+    "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的思考过程，实现对长篇专业文档（如财务报告、法律文件）的精准、类人检索，无需向量数据库或文本分块，支持PDF和OCR处理，已在FinanceBench基准上达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmp8sz37qn_.md",
+    "line_count": 375
+  },
+  "a78a5c25-609f-425e-8abb-fe649899b10b": {
+    "type": "md",
+    "doc_name": "tmp4m9trmwi",
+    "doc_description": "该文档为国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》的完整技术内容，系统规定了电子会计档案的整理、封装、结构格式（OPG）、数字签名及长期可读性等技术要求，适用于电子会计档案的归档、解析与利用，强调标准化、安全性和可追溯性，是电子凭证与会计档案管理的重要技术依据。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmp4m9trmwi.md",
+    "line_count": 4512
+  },
+  "93ffae74-d6e7-4a27-bcb1-36f990821200": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这份文档是面向初次接触 Ralph 的开发者的完整用户指南，详细介绍了如何通过 `prd.json` 驱动自动化开发任务，涵盖从准备项目结构、生成需求文档、配置执行参数到运行与调试的全流程，特别强调了路径 A（仅使用 Ralph CLI）的简易上手方式及路径 B（结合 OpenSpec + Superpowers + Ralph）的完整流水线协作模式，是实现高效、可验证 AI 辅助开发的核心操作手册。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
+  },
+  "95cf0015-8972-4b88-a397-6db5ac6afef3": {
+    "type": "md",
+    "doc_name": "tmpxxl7qdxb",
+    "doc_description": "该文档为国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，系统规定了电子会计档案的封装结构、技术要求、数字签名机制及OPG封装格式，旨在实现电子会计档案的完整性、可读性、安全性与长期可利用性，适用于电子会计档案的归档、解析与管理。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpxxl7qdxb.md",
+    "line_count": 4512
+  },
+  "67c6419f-37d3-4ff4-9703-e4cf848514a6": {
+    "type": "md",
+    "doc_name": "travel_policy_2026",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于全职、兼职员工及经批准的外部合作人员，强调实报实销、标准控制与时效性原则，并明确各级审批权限与财务支付时限。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
+    "line_count": 99
+  },
+  "f15d8257-359a-4906-aab1-8ee755b4a948": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这是一份面向初学者的完整指南，详细阐述了如何通过 Ralph CLI 从需求文档（prd.json）出发，自动化推进开发任务，涵盖从准备项目结构、生成 PRD、配置执行参数到运行、调试和恢复任务的全流程，特别强调了小故事拆分与可验证验收标准的重要性，并提供了两种使用路径：纯 CLI 快速执行与集成 OpenSpec/Superpowers 的完整流水线。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
+  },
+  "127873e2-96e6-464a-a244-b8738854f02b": {
+    "type": "md",
+    "doc_name": "travel_policy_2026",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通、住宿、餐饮补贴标准、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，强调实报实销、标准控制与时效性原则，并明确各级审批权限与财务支付时限。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
+    "line_count": 99
+  },
+  "ce213e66-73fa-4f15-ab5a-cc64b9ba70ea": {
+    "type": "md",
+    "doc_name": "tmpjgs0dwkz",
+    "doc_description": "一个基于推理的RAG系统，通过树搜索模拟人类专家从长篇专业文档中提取知识，无需向量数据库或文本分块，在金融报告、法律文件等复杂文档分析中实现高达98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpjgs0dwkz.md",
+    "line_count": 375
+  },
+  "d95fdf29-4824-4c42-ac36-6eb599af202c": {
+    "type": "md",
+    "doc_name": "tmpfovrgozp",
+    "doc_description": "一个基于推理的无向量RAG系统，通过树搜索模拟人类专家的阅读与检索行为，实现对长篇专业文档（如财务报告、法律文件）的高精度、类人化信息提取，无需依赖向量数据库或文本分块，支持本地自托管与云端API部署，并在FinanceBench基准测试中达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpfovrgozp.md",
+    "line_count": 375
+  },
+  "d4f9b242-fede-4fa0-9fa0-290fe9acd531": {
+    "type": "md",
+    "doc_name": "tmpbu80tv00",
+    "doc_description": "该文档为中华人民共和国国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，详细规定了电子会计档案在整理、封装、存储与利用过程中的技术规范，涵盖适用范围、术语定义、封装结构（基于OPG格式）、元数据管理、数字签名机制及安全要求，并附有封装结构图示、文件格式规范和XML Schema，旨在保障电子会计档案的完整性、可读性、安全性和长期可访问性。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpbu80tv00.md",
+    "line_count": 4512
+  },
+  "90e95280-5a44-437f-a423-7628c731ba0c": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这是一份面向初学者的完整指南，详细介绍了如何通过 Ralph CLI 从零开始自动化推进开发任务，涵盖从需求撰写、PRD 转换、配置管理到执行监控的全流程，并提供两条可选路径：快速上手的纯 CLI 模式与集成 OpenSpec 和 Superpowers 的完整流水线模式。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
+  },
+  "b1c110f1-46e4-423b-ae9d-ee953d73a7e9": {
+    "type": "md",
+    "doc_name": "travel_policy_2026",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，旨在规范差旅行为并加强费用管控。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
+    "line_count": 99
   }
 }
