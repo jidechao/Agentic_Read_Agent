@@ -70,6 +70,15 @@ class FileInfo:
 
 
 @dataclass
+class ScanResult:
+    """Typed result of a data directory scan."""
+
+    to_process: list[FileInfo]
+    skipped: list[FileInfo]
+    deleted: list[str]
+
+
+@dataclass
 class CompileResult:
     """Summary returned after a compile run completes."""
 
@@ -109,14 +118,14 @@ class KnowledgeCompiler:
         try:
             changes = self.scan_data_dir(force, data_dir=data_dir)
 
-            for fi in changes["to_process"]:
+            for fi in changes.to_process:
                 self.process_document(fi)
 
-            for doc_id in changes["deleted"]:
+            for doc_id in changes.deleted:
                 self.registry.delete_document(doc_id)
 
             num_clusters = 0
-            if changes["to_process"] or changes["deleted"]:
+            if changes.to_process or changes.deleted:
                 num_clusters = self._compile_clusters(run_id)
                 # Promote all embedded docs to compiled status
                 for doc in self.registry.list_documents(status="embedded"):
@@ -130,14 +139,14 @@ class KnowledgeCompiler:
 
             self.registry.complete_compile_run(
                 run_id,
-                docs_processed=len(changes["to_process"]),
-                docs_skipped=len(changes["skipped"]),
+                docs_processed=len(changes.to_process),
+                docs_skipped=len(changes.skipped),
             )
 
             return CompileResult(
-                docs_processed=len(changes["to_process"]),
-                docs_skipped=len(changes["skipped"]),
-                docs_deleted=len(changes["deleted"]),
+                docs_processed=len(changes.to_process),
+                docs_skipped=len(changes.skipped),
+                docs_deleted=len(changes.deleted),
                 clusters_created=num_clusters,
             )
         except Exception as e:
@@ -148,10 +157,10 @@ class KnowledgeCompiler:
 
     def scan_data_dir(
         self, force: bool = False, data_dir: Path | None = None
-    ) -> dict[str, list]:
+    ) -> ScanResult:
         """Scan data/ dir recursively.
 
-        Returns dict with to_process, skipped, and deleted lists.
+        Returns ScanResult with to_process, skipped, and deleted lists.
         """
         scan_dir = data_dir or cfg.DATA_DIR
         supported_exts = {".pdf", ".md", ".markdown", ".docx", ".doc", ".html", ".htm"}
@@ -178,14 +187,10 @@ class KnowledgeCompiler:
             else:
                 to_process.append(fi)
 
-        # Detect deleted: docs in registry not found in current scan
-        all_docs = self.registry.list_documents()
-        deleted: list[str] = []
-        for doc in all_docs:
-            if doc["content_hash"] not in seen_hashes:
-                deleted.append(doc["id"])
+        # Detect deleted: compiled docs whose hash is absent from current scan
+        deleted = self.registry.find_deleted_doc_ids(seen_hashes)
 
-        return {"to_process": to_process, "skipped": skipped, "deleted": deleted}
+        return ScanResult(to_process=to_process, skipped=skipped, deleted=deleted)
 
     # ── Single document pipeline ──────────────────────────────────────────
 

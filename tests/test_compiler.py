@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.compiler import FileInfo, KnowledgeCompiler
+from src.compiler import FileInfo, KnowledgeCompiler, ScanResult
 from src.registry import KnowledgeRegistry
 
 
@@ -44,9 +44,16 @@ def test_scan_detects_new_files(tmp_env):
     _create_file(data_dir, "doc2.pdf", "fake pdf")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["to_process"]) == 2
-    assert len(changes["skipped"]) == 0
-    assert len(changes["deleted"]) == 0
+    assert len(changes.to_process) == 2
+    assert len(changes.skipped) == 0
+    assert len(changes.deleted) == 0
+
+
+def test_scan_returns_scan_result(tmp_env):
+    """scan_data_dir returns a ScanResult dataclass, not a plain dict."""
+    compiler, data_dir, _ = tmp_env
+    changes = compiler.scan_data_dir(data_dir=data_dir)
+    assert isinstance(changes, ScanResult)
 
 
 def test_scan_skips_unchanged(tmp_env):
@@ -59,8 +66,8 @@ def test_scan_skips_unchanged(tmp_env):
     registry.update_document_status(doc_id, "compiled")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["skipped"]) == 1
-    assert len(changes["to_process"]) == 0
+    assert len(changes.skipped) == 1
+    assert len(changes.to_process) == 0
 
 
 def test_scan_detects_changed_file(tmp_env):
@@ -72,8 +79,8 @@ def test_scan_detects_changed_file(tmp_env):
     registry.update_document_status(doc_id, "compiled")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["to_process"]) == 1
-    assert len(changes["skipped"]) == 0
+    assert len(changes.to_process) == 1
+    assert len(changes.skipped) == 0
 
 
 def test_scan_detects_deleted_file(tmp_env):
@@ -83,8 +90,8 @@ def test_scan_detects_deleted_file(tmp_env):
     registry.update_document_status(doc_id, "compiled")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["deleted"]) == 1
-    assert changes["deleted"][0] == doc_id
+    assert len(changes.deleted) == 1
+    assert changes.deleted[0] == doc_id
 
 
 def test_scan_force_processes_all(tmp_env):
@@ -96,7 +103,7 @@ def test_scan_force_processes_all(tmp_env):
     registry.update_document_status(doc_id, "compiled")
 
     changes = compiler.scan_data_dir(force=True, data_dir=data_dir)
-    assert len(changes["to_process"]) == 1
+    assert len(changes.to_process) == 1
 
 
 def test_scan_ignores_unsupported_formats(tmp_env):
@@ -107,7 +114,7 @@ def test_scan_ignores_unsupported_formats(tmp_env):
     _create_file(data_dir, "data.csv", "a,b,c")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["to_process"]) == 1  # only .md
+    assert len(changes.to_process) == 1  # only .md
 
 
 def test_scan_nested_directories(tmp_env):
@@ -117,8 +124,8 @@ def test_scan_nested_directories(tmp_env):
     _create_file(data_dir / "sub" / "deep", "b.html", "<h1>B</h1>")
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert len(changes["to_process"]) == 2
-    paths = {fi.relative_path for fi in changes["to_process"]}
+    assert len(changes.to_process) == 2
+    paths = {fi.relative_path for fi in changes.to_process}
     assert str(Path("sub") / "a.md") in paths
     assert str(Path("sub") / "deep" / "b.html") in paths
 
@@ -151,12 +158,12 @@ def test_scan_mixed_scenarios(tmp_env):
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
 
-    assert len(changes["skipped"]) == 1
-    assert len(changes["to_process"]) == 2  # changed + new
+    assert len(changes.skipped) == 1
+    assert len(changes.to_process) == 2  # changed + new
     # Both the truly deleted doc AND the changed doc (old hash missing) are
     # detected as deleted since their hashes no longer appear on disk.
-    assert len(changes["deleted"]) == 2
-    assert doc_deleted in changes["deleted"]
+    assert len(changes.deleted) == 2
+    assert doc_deleted in changes.deleted
 
 
 def test_fileinfo_dataclass_fields(tmp_env):
@@ -166,7 +173,7 @@ def test_fileinfo_dataclass_fields(tmp_env):
     expected_hash = hashlib.sha256(f.read_bytes()).hexdigest()
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    fi = changes["to_process"][0]
+    fi = changes.to_process[0]
 
     assert isinstance(fi, FileInfo)
     assert fi.path == f
@@ -179,9 +186,9 @@ def test_scan_empty_data_dir(tmp_env):
     compiler, data_dir, _ = tmp_env
 
     changes = compiler.scan_data_dir(data_dir=data_dir)
-    assert changes["to_process"] == []
-    assert changes["skipped"] == []
-    assert changes["deleted"] == []
+    assert changes.to_process == []
+    assert changes.skipped == []
+    assert changes.deleted == []
 
 
 def test_streaming_hash_matches_standard(tmp_path):
