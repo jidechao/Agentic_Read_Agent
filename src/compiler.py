@@ -27,6 +27,15 @@ from src.registry import KnowledgeRegistry
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 
+def _sha256_file(path: Path) -> str:
+    """Compute SHA-256 hash using constant 64KB memory."""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def _normalize_ws(text: str) -> str:
     """Collapse consecutive whitespace and strip for fuzzy matching."""
     import re
@@ -154,7 +163,7 @@ class KnowledgeCompiler:
         for fpath in scan_dir.rglob("*"):
             if not fpath.is_file() or fpath.suffix.lower() not in supported_exts:
                 continue
-            content_hash = hashlib.sha256(fpath.read_bytes()).hexdigest()
+            content_hash = _sha256_file(fpath)
             seen_hashes.add(content_hash)
             rel_path = str(fpath.relative_to(scan_dir))
             fi = FileInfo(path=fpath, content_hash=content_hash, relative_path=rel_path)
