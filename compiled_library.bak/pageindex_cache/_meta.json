@@ -19,5 +19,12 @@
     "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，强调实报实销、标准控制与时效性原则。",
     "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
     "line_count": 99
+  },
+  "1087bfd7-7bec-4339-904e-142ae4cb6335": {
+    "type": "md",
+    "doc_name": "ralph-longtask-使用指南",
+    "doc_description": "这份文档是面向初次接触 Ralph 的开发者的完整用户指南，详细介绍了如何通过 `prd.json` 驱动自动化开发任务，涵盖从准备项目结构、生成需求文档、配置执行参数到运行与调试的全流程，特别强调了路径 A（仅使用 Ralph CLI）的简单上手方式及路径 B（结合 OpenSpec + Superpowers + Ralph）的完整流水线协作模式，帮助开发者高效落地 AI 驱动的渐进式开发。",
+    "path": "/Volumes/MyWork/project/agentic_read_agent/data/ralph-longtask-使用指南.md",
+    "line_count": 708
   }
 }
