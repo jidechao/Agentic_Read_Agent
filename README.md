@@ -370,7 +370,7 @@ python -m src.triggers.cli serve [--host 0.0.0.0] [--port 8000]
 │       ├── watcher.py       # 文件监控
 │       ├── scheduler.py     # 定时调度
 │       └── api_server.py    # HTTP API
-├── tests/                   # 测试（53 tests）
+├── tests/                   # 测试（58 tests）
 ├── PageIndex/               # PageIndex 子模块
 ├── knowledge.db             # 文档注册表数据库
 ├── requirements.txt         # Python 依赖
