@@ -111,6 +111,38 @@ def test_find_by_hash(registry: KnowledgeRegistry) -> None:
     assert missing is None
 
 
+def test_find_deleted_doc_ids(registry: KnowledgeRegistry) -> None:
+    """find_deleted_doc_ids returns IDs of compiled docs whose hash is absent."""
+    id_alive = registry.register_document(
+        source_path="/data/a.txt", format="text", content_hash="h_alive"
+    )
+    id_dead = registry.register_document(
+        source_path="/data/b.txt", format="text", content_hash="h_dead"
+    )
+    id_error = registry.register_document(
+        source_path="/data/c.txt", format="text", content_hash="h_error"
+    )
+    registry.update_document_status(id_alive, "compiled")
+    registry.update_document_status(id_dead, "compiled")
+    registry.update_document_status(id_error, "error")
+
+    # Only id_dead's hash is missing from seen_hashes
+    result = registry.find_deleted_doc_ids({"h_alive", "h_error"})
+    assert id_dead in result
+    assert id_alive not in result
+    assert id_error not in result  # error status excluded
+
+
+def test_find_deleted_doc_ids_empty_seen(registry: KnowledgeRegistry) -> None:
+    """Empty seen_hashes returns all compiled doc IDs."""
+    id_a = registry.register_document(
+        source_path="/data/a.txt", format="text", content_hash="ha"
+    )
+    registry.update_document_status(id_a, "compiled")
+    result = registry.find_deleted_doc_ids(set())
+    assert id_a in result
+
+
 def test_list_documents_by_status(registry: KnowledgeRegistry) -> None:
     id_a = registry.register_document(
         source_path="/data/a.txt", format="text", content_hash="ha"

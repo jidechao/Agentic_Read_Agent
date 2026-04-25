@@ -183,6 +183,25 @@ class KnowledgeRegistry:
         ).fetchone()
         return _row_to_dict(row)
 
+    def find_deleted_doc_ids(self, seen_hashes: set[str]) -> list[str]:
+        """Return IDs of compiled docs whose content_hash is not in seen_hashes.
+
+        If seen_hashes is empty (empty data dir), all compiled doc IDs are returned.
+        """
+        conn = self._get_conn()
+        if not seen_hashes:
+            rows = conn.execute(
+                "SELECT id FROM documents WHERE status = 'compiled'"
+            ).fetchall()
+        else:
+            placeholders = ",".join("?" for _ in seen_hashes)
+            rows = conn.execute(
+                f"SELECT id FROM documents WHERE status = 'compiled' "
+                f"AND content_hash NOT IN ({placeholders})",
+                list(seen_hashes),
+            ).fetchall()
+        return [row["id"] for row in rows]
+
     def list_documents(
         self,
         status: str | None = None,
