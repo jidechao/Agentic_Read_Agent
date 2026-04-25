@@ -1,8 +1,4 @@
-import os
-
 import pytest
-
-os.environ.setdefault("SILICONFLOW_API_KEY", "test-key")
 
 from src.classifier import DocumentClassifier
 from src.ingester import Heading, IngestResult

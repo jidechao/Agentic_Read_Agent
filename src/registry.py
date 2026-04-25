@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS document_clusters (
     cluster_id  INTEGER REFERENCES clusters(id),
     PRIMARY KEY (doc_id, cluster_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_documents_content_hash ON documents(content_hash);
+CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 """
 
 
@@ -189,17 +192,16 @@ class KnowledgeRegistry:
         If seen_hashes is empty (empty data dir), all compiled doc IDs are returned.
         """
         conn = self._get_conn()
-        if not seen_hashes:
-            rows = conn.execute(
-                "SELECT id FROM documents WHERE status = 'compiled'"
-            ).fetchall()
-        else:
+        query = "SELECT id FROM documents WHERE status = 'compiled'"
+        values: list[str] = []
+
+        if seen_hashes:
+            # placeholders contain only '?' literals; values passed as bind params
             placeholders = ",".join("?" for _ in seen_hashes)
-            rows = conn.execute(
-                f"SELECT id FROM documents WHERE status = 'compiled' "
-                f"AND content_hash NOT IN ({placeholders})",
-                list(seen_hashes),
-            ).fetchall()
+            query += f" AND content_hash NOT IN ({placeholders})"
+            values = list(seen_hashes)
+
+        rows = conn.execute(query, values).fetchall()
         return [row["id"] for row in rows]
 
     def list_documents(

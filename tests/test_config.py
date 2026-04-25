@@ -1,10 +1,8 @@
 """验证配置模块的新增项存在且可访问。"""
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-os.environ.setdefault("SILICONFLOW_API_KEY", "test-key-for-config-test")
 
 
 def test_config_has_classifier_settings():

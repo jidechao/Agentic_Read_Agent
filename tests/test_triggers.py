@@ -1,10 +1,7 @@
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
-
-os.environ.setdefault("SILICONFLOW_API_KEY", "test-key")
 
 
 def test_cli_compile_no_args():
