@@ -56,6 +56,19 @@ def test_scan_returns_scan_result(tmp_env):
     assert isinstance(changes, ScanResult)
 
 
+def test_scan_ignores_non_compiled_deleted_docs(tmp_env):
+    """Docs in error/ingested status are NOT marked as deleted even if absent from disk."""
+    compiler, data_dir, registry = tmp_env
+    id_error = registry.register_document("error.md", "md", "err_hash")
+    registry.update_document_status(id_error, "error")
+    id_ingested = registry.register_document("ingested.md", "md", "ing_hash")
+    # ingested status is the default, no update needed
+
+    changes = compiler.scan_data_dir(data_dir=data_dir)
+    assert id_error not in changes.deleted
+    assert id_ingested not in changes.deleted
+
+
 def test_scan_skips_unchanged(tmp_env):
     """Registry has compiled doc with matching hash -> skipped."""
     compiler, data_dir, registry = tmp_env
