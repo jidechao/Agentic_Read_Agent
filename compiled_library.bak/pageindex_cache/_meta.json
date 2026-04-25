@@ -1,22 +1,22 @@
 {
-  "39ed4d79-1734-4603-9d97-ea6a1101392f": {
+  "ee10785d-dabb-4df5-96ba-8b65d09a8dfc": {
     "type": "md",
-    "doc_name": "tmpwocwth09",
-    "doc_description": "一个基于推理的RAG系统，通过树搜索模拟人类专家从长篇专业文档（如财务报告、法律文件）中提取知识的过程，无需向量数据库或文本分块，实现类人、透明且高准确率的检索，支持本地自托管或云端API快速部署。",
-    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpwocwth09.md",
+    "doc_name": "tmpf0nef3xj",
+    "doc_description": "一个基于推理的RAG系统，通过树搜索和文档结构化索引实现类人检索，无需向量数据库或文本分块，专为金融、法律、技术等长篇专业文档的高精度信息提取而设计，支持自托管与云端部署，并在FinanceBench基准测试中达到98.7%的准确率。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpf0nef3xj.md",
     "line_count": 375
   },
-  "a8f10a74-421d-4215-be90-2b9991b516e8": {
+  "c588c21c-6317-424e-8d03-4fc307ac6c7f": {
     "type": "md",
-    "doc_name": "tmpaozzxkd2",
-    "doc_description": "该文档为中华人民共和国国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，系统规定了电子会计档案的整理、封装、元数据管理及长期可读性等技术要求，涵盖会计凭证、账簿、财务报告等档案的电子化封装格式（OPG）、XML Schema定义、数字签名机制及安全规范，旨在为电子会计档案的归档、存储、交换与管理提供统一的标准化技术支撑。",
-    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpaozzxkd2.md",
+    "doc_name": "tmpxjqhj0fb",
+    "doc_description": "该文档为国家标准GB/T 44555—2024《电子凭证 会计档案封装技术要求》，详细规定了电子会计档案的整理、封装、格式规范及技术实现，采用OPG开放式封装包格式，涵盖术语定义、封装结构、数字签名、XML Schema等技术要求，适用于电子会计档案的标准化管理与长期保存。",
+    "path": "/var/folders/wq/xgvyrt3s1lz75tr2kbzgltfr0000gn/T/tmpxjqhj0fb.md",
     "line_count": 4512
   },
-  "54b2ed8b-357c-4aec-a052-dae0f49d0ea4": {
+  "acc8c431-032e-4b1f-a59d-65ade52752b7": {
     "type": "md",
     "doc_name": "travel_policy_2026",
-    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通、住宿、餐饮补贴标准、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，强调实报实销、标准控制与时效性原则，并明确各级审批权限与财务支付时限。",
+    "doc_description": "本文件为2026年公司差旅报销政策，详细规定了差旅费用的适用范围、交通与住宿标准、餐饮补贴、票据遗失处理及报销流程，适用于公司全体员工及经批准的外部合作人员，强调实报实销、标准控制与时效性原则。",
     "path": "/Volumes/MyWork/project/agentic_read_agent/data/travel_policy_2026.md",
     "line_count": 99
   }

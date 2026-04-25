@@ -6,20 +6,21 @@ Only processes documents that are new or changed since the last successful compi
 from __future__ import annotations
 
 import hashlib
-import json
-import math
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 from openai import OpenAI
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-
 import src.config as cfg
 from src.classifier import DocumentClassifier
+from src.clustering.coarse import cosine_agglomerative, centroid, l2_normalize
+from src.clustering.discovery import DiscoveredCategory, discover_categories
+from src.clustering.llm_assign import assign_to_existing_category
+from src.clustering.naming import name_category_with_llm
+from src.clustering.review import merge_singleton_categories_by_keywords, review_pending_by_similarity
 from src.ingester import DocumentIngester, IngestResult
 from src.registry import KnowledgeRegistry
 
@@ -126,7 +127,12 @@ class KnowledgeCompiler:
 
             num_clusters = 0
             if changes.to_process or changes.deleted:
-                num_clusters = self._compile_clusters(run_id)
+                if self.registry.list_categories() and not force and not changes.deleted:
+                    num_clusters = self._incremental_assign_clusters(run_id)
+                else:
+                    if force:
+                        self.registry.clear_categories()
+                    num_clusters = self._compile_clusters(run_id)
                 # Promote all embedded docs to compiled status
                 for doc in self.registry.list_documents(status="embedded"):
                     self.registry.update_document_status(doc["id"], "compiled")
@@ -235,7 +241,7 @@ class KnowledgeCompiler:
             # Embed (with cache check) — use title + headings for focused semantics
             cached = self.registry.get_embedding(doc_id)
             if cached is None:
-                embed_text = self._build_embed_text(result)
+                embed_text = self._build_embed_text(result, fi.content_hash)
                 vectors = self._get_embeddings([embed_text])
                 self.registry.cache_embedding(doc_id, vectors[0])
 
@@ -249,23 +255,76 @@ class KnowledgeCompiler:
 
     # ── Embedding helpers ──────────────────────────────────────────────────
 
-    @staticmethod
-    def _build_embed_text(result: IngestResult) -> str:
+    def _build_embed_text(self, result: IngestResult, content_hash: str) -> str:
         """Build embedding input: title + headings + content excerpt.
 
-        Title and headings give topic structure, content excerpt adds
-        domain-specific vocabulary for better cluster separation.
+        A cached LLM topic summary carries the semantic signal while a small
+        cleaned excerpt preserves domain vocabulary without PDF front-matter
+        noise dominating the vector.
         """
         parts = []
         if result.title:
             parts.append(result.title)
+        topic_summary = self._build_topic_summary(result, content_hash)
+        if topic_summary:
+            parts.append(topic_summary)
         if result.headings:
-            parts.extend(h.text for h in result.headings if h.text.strip())
-        # Add first ~300 chars of body for domain vocabulary
-        body = result.text[:300].strip()
+            parts.extend(h.text for h in result.headings[:8] if h.text.strip())
+        body = self._strip_pdf_noise(result.text)[:200].strip()
         if body:
             parts.append(body)
         return " ".join(parts) if parts else result.text[:500]
+
+    def _build_topic_summary(self, result: IngestResult, content_hash: str) -> str:
+        """Return a cached 40-80 char topic summary, generating it if needed."""
+        cached = self.registry.get_topic_summary(content_hash)
+        if cached:
+            return cached
+
+        fallback = self._build_summary(result, max_chars=cfg.LLM_SUMMARY_MAX_CHARS)
+        text = self._strip_pdf_noise(result.text)[:1500]
+        prompt = (
+            "请为以下企业知识库文档生成 40-80 字中文主题摘要，"
+            "只描述主题、对象、关键概念，不要复述版权页、目录或页眉。\n\n"
+            f"标题：{result.title}\n"
+            f"正文片段：{text}\n"
+        )
+        try:
+            response = self._sf_client.chat.completions.create(
+                model=cfg.TOPIC_SUMMARY_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=160,
+            )
+            summary = response.choices[0].message.content.strip()
+            summary = re.sub(r"\s+", " ", summary)[: cfg.LLM_SUMMARY_MAX_CHARS]
+        except Exception:
+            summary = fallback
+        self.registry.cache_topic_summary(content_hash, summary)
+        return summary
+
+    @staticmethod
+    def _strip_pdf_noise(text: str) -> str:
+        """Remove common PDF front-matter lines before building semantic inputs."""
+        noisy_patterns = (
+            r"^\s*ICS\b",
+            r"^\s*CCS\b",
+            r"^\s*GB\b",
+            r"GITHUB\s+TRENDING",
+            r"^\s*Page\s+\d+\s*$",
+            r"^\s*\d+\s*/\s*\d+\s*$",
+            r"版权所有|Copyright",
+            r"^\s*目\s*录\s*$",
+        )
+        lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if any(re.search(pattern, stripped, flags=re.IGNORECASE) for pattern in noisy_patterns):
+                continue
+            lines.append(stripped)
+        return "\n".join(lines) if lines else text
 
     @staticmethod
     def _build_summary(result: IngestResult, max_chars: int = 120) -> str:
@@ -301,7 +360,7 @@ class KnowledgeCompiler:
                     dimensions=cfg.EMBEDDING_DIMENSION,
                 )
                 return [
-                    np.array(item.embedding, dtype=np.float32)
+                    l2_normalize(np.array(item.embedding, dtype=np.float32))
                     for item in response.data
                 ]
             except Exception:
@@ -314,13 +373,23 @@ class KnowledgeCompiler:
     # ── Clustering ────────────────────────────────────────────────────────
 
     def _compile_clusters(self, run_id: int) -> int:
-        """KMeans clustering + LLM naming. Returns number of clusters.
+        """Cosine coarse clustering + LLM naming. Returns number of categories.
 
-        Uses title+heading embeddings (focused semantics) with auto-K
-        selection via silhouette score.
+        Full compilation rebuilds stable categories from all embedded/compiled
+        documents so old documents are not dropped when only one file changed.
         """
-        docs = self.registry.list_documents(status="embedded")
+        old_categories = self.registry.list_categories()
+        old_by_name = {
+            category["canonical_name"]: category for category in old_categories
+        }
+        old_by_doc_id = {
+            assignment["doc_id"]: old_by_name.get(assignment["canonical_name"])
+            for assignment in self.registry.list_document_categories()
+        }
+
+        docs = self._list_clusterable_documents()
         if not docs:
+            self.registry.clear_categories()
             return 0
 
         vectors: list[np.ndarray] = []
@@ -332,92 +401,316 @@ class KnowledgeCompiler:
                 doc_ids.append(doc["id"])
 
         n = len(vectors)
-        if n < 2:
+        if n == 0:
+            self.registry.clear_categories()
             return 0
+        if n < 2:
+            self.registry.clear_categories()
+            doc_id = doc_ids[0]
+            old_category = old_by_doc_id.get(doc_id)
+            self._create_single_doc_category(
+                doc_id,
+                category_id=old_category["id"] if old_category else None,
+                canonical_name=old_category["canonical_name"] if old_category else None,
+                display_name=old_category.get("display_name") if old_category else None,
+                description=old_category.get("description") if old_category else None,
+            )
+            return 1
 
         matrix = np.array(vectors)
-        k = self._find_optimal_k(matrix, n)
-        print(f"自动选择 K={k} (共 {n} 个文档)")
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        labels = kmeans.fit_predict(matrix)
+        labels = cosine_agglomerative(matrix, cfg.CLUSTER_COSINE_THRESHOLD)
+        print(f"余弦层次聚类生成 {len(set(labels))} 个候选类目 (共 {n} 个文档)")
 
-        clusters = []
-        for cluster_id in range(k):
-            indices = [i for i, label in enumerate(labels) if label == cluster_id]
-            titles = [
-                docs[i]["title"] or docs[i]["source_path"] for i in indices
-            ]
-            cids = [doc_ids[i] for i in indices]
-            name, description = self._name_cluster(titles)
-            clusters.append(
-                {"name": name, "description": description, "doc_ids": cids}
+        docs_by_id = {doc["id"]: doc for doc in docs}
+        vectors_by_doc_id = dict(zip(doc_ids, vectors))
+        summaries = {
+            doc["id"]: self._summary_for_doc(doc)
+            for doc in docs
+        }
+
+        discovered = self._merge_duplicate_discovered_categories(
+            discover_categories(
+                self._sf_client,
+                cfg.CLUSTER_NAMING_MODEL,
+                docs_by_id,
+                summaries,
+                vectors_by_doc_id,
+                labels,
+                doc_ids,
             )
-
-        self.registry.save_clusters(clusters, run_id)
-        return len(clusters)
-
-    @staticmethod
-    def _find_optimal_k(matrix: np.ndarray, n: int) -> int:
-        """Find optimal K via silhouette score with granularity guard.
-
-        When all scores are low (embeddings are close), prefer more clusters
-        to avoid dumping unrelated docs into the same group.
-        """
-        if n <= 2:
-            return 2
-        max_k = min(n - 1, max(2, int(math.sqrt(n) * 2)))
-        if max_k < 2:
-            return 2
-
-        scores: dict[int, float] = {}
-        for k in range(2, max_k + 1):
-            km = KMeans(n_clusters=k, random_state=42, n_init=10)
-            labels = km.fit_predict(matrix)
-            if len(set(labels)) < 2:
-                continue
-            scores[k] = float(silhouette_score(matrix, labels))
-
-        if not scores:
-            return 2
-
-        best_k = max(scores, key=scores.get)
-        best_score = scores[best_k]
-
-        # Granularity guard: if best score is low, embeddings are too similar.
-        # Prefer finer granularity so each cluster is smaller and more focused.
-        if best_score < 0.15:
-            threshold = best_score * 0.8
-            for k in sorted(scores.keys(), reverse=True):
-                if scores[k] >= threshold:
-                    return k
-
-        return best_k
-
-    def _name_cluster(self, doc_titles: list[str]) -> tuple[str, str]:
-        """Call LLM to name a cluster based on its document titles."""
-        prompt = (
-            "以下是同一分类的企业知识文档标题列表：\n"
-            + "\n".join(f"- {t}" for t in doc_titles)
-            + "\n\n请用一个简短的英文短语作为分类目录名（小写，用连字符连接，如 it-hr），"
-            "再写一句中文描述该分类。\n"
-            '请严格按以下 JSON 格式返回：{"name": "xxx", "description": "xxx"}'
         )
-        try:
-            response = self._sf_client.chat.completions.create(
-                model=cfg.CLUSTER_NAMING_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=200,
+
+        self.registry.clear_categories()
+        legacy_clusters: list[dict[str, object]] = []
+        for category in discovered:
+            old_category = old_by_name.get(category.canonical_name)
+            category_id = self.registry.upsert_category(
+                canonical_name=category.canonical_name,
+                display_name=category.display_name,
+                description=category.description,
+                centroid=category.centroid,
+                doc_count=len(category.doc_ids),
+                category_id=old_category["id"] if old_category else None,
             )
-            text = response.choices[0].message.content.strip()
-            if text.startswith("```"):
-                text = text.split("```")[1]
-                if text.startswith("json"):
-                    text = text[4:]
-            result = json.loads(text.strip())
-            return result["name"], result["description"]
-        except (json.JSONDecodeError, KeyError):
-            return "cluster-default", "默认分类"
+            for doc_id in category.doc_ids:
+                sim = float(
+                    np.dot(l2_normalize(vectors_by_doc_id[doc_id]), category.centroid)
+                )
+                self.registry.replace_document_category(
+                    doc_id,
+                    category_id,
+                    similarity=sim,
+                    assigned_by="llm",
+                    confidence=max(0.5, sim),
+                )
+            legacy_clusters.append(
+                {
+                    "name": category.canonical_name,
+                    "description": category.description,
+                    "doc_ids": category.doc_ids,
+                }
+            )
+
+        self._merge_singleton_categories()
+        legacy_clusters = [
+            {
+                "name": category["canonical_name"],
+                "description": category.get("description"),
+                "doc_ids": [
+                    doc["id"]
+                    for doc in self.registry.list_category_documents(category["id"])
+                ],
+            }
+            for category in self.registry.list_categories()
+        ]
+        self.registry.save_clusters(legacy_clusters, run_id)
+        return len(self.registry.list_categories())
+
+    def _incremental_assign_clusters(self, run_id: int) -> int:
+        """Assign newly embedded documents to existing stable categories."""
+        categories = self.registry.list_categories()
+        pending: dict[str, np.ndarray] = {}
+        legacy_clusters: dict[str, dict[str, object]] = {
+            c["id"]: {
+                "name": c["canonical_name"],
+                "description": c.get("description"),
+                "doc_ids": [],
+            }
+            for c in categories
+        }
+
+        for doc in self.registry.list_documents(status="embedded"):
+            emb = self.registry.get_embedding(doc["id"])
+            if emb is None:
+                continue
+            assignment = assign_to_existing_category(
+                emb, categories, cfg.INCREMENTAL_ASSIGN_THRESHOLD
+            )
+            if assignment is None:
+                pending[doc["id"]] = emb
+                continue
+            self.registry.replace_document_category(
+                doc["id"],
+                assignment.category_id,
+                assignment.similarity,
+                assignment.assigned_by,
+                assignment.confidence,
+            )
+            legacy_clusters[assignment.category_id]["doc_ids"].append(doc["id"])
+
+        if pending:
+            if self._pending_requires_rebalance(len(pending)):
+                return self._compile_clusters(run_id)
+            reviewed = review_pending_by_similarity(
+                pending,
+                categories,
+                threshold=max(0.35, cfg.INCREMENTAL_ASSIGN_THRESHOLD - 0.15),
+            )
+            for doc_id, assignment in reviewed.items():
+                if assignment is None:
+                    self._create_single_doc_category(doc_id)
+                    continue
+                self.registry.replace_document_category(
+                    doc_id,
+                    assignment.category_id,
+                    assignment.similarity,
+                    "llm",
+                    min(assignment.confidence, 0.69),
+                )
+                legacy_clusters[assignment.category_id]["doc_ids"].append(doc_id)
+
+        self._refresh_category_centroids()
+        self.registry.save_clusters(list(legacy_clusters.values()), run_id)
+        return len(self.registry.list_categories())
+
+    def _list_clusterable_documents(self) -> list[dict[str, object]]:
+        """Return documents that should participate in category materialization."""
+        docs = []
+        for status in ("embedded", "compiled"):
+            docs.extend(self.registry.list_documents(status=status))
+        return docs
+
+    def _summary_for_doc(self, doc: dict[str, object]) -> str:
+        """Return cached summary for a registry document."""
+        doc_id = str(doc["id"])
+        if doc_id in self._doc_summaries:
+            return self._doc_summaries[doc_id]
+        cached = self.registry.get_topic_summary(str(doc["content_hash"]))
+        if cached:
+            self._doc_summaries[doc_id] = cached
+            return cached
+        fallback = str(doc.get("title") or doc.get("source_path") or "")
+        self._doc_summaries[doc_id] = fallback
+        return fallback
+
+    def _create_single_doc_category(
+        self,
+        doc_id: str,
+        category_id: str | None = None,
+        canonical_name: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+    ) -> None:
+        """Create a category for a low-confidence document as a review fallback."""
+        doc = self.registry.get_document(doc_id)
+        emb = self.registry.get_embedding(doc_id)
+        if doc is None or emb is None:
+            return
+        title = doc.get("title") or doc.get("source_path") or "knowledge"
+        summary = self._summary_for_doc(doc)
+        if canonical_name is None or display_name is None or description is None:
+            generated = name_category_with_llm(
+                self._sf_client, cfg.CLUSTER_NAMING_MODEL, [title], [summary]
+            )
+            canonical_name = canonical_name or generated[0]
+            display_name = display_name or generated[1]
+            description = description or generated[2]
+        saved_category_id = self.registry.upsert_category(
+            canonical_name,
+            display_name,
+            description,
+            l2_normalize(emb),
+            doc_count=1,
+            category_id=category_id,
+        )
+        self.registry.replace_document_category(
+            doc_id, saved_category_id, 1.0, "llm", 0.5
+        )
+
+    def _merge_duplicate_discovered_categories(
+        self, categories: list[DiscoveredCategory]
+    ) -> list[DiscoveredCategory]:
+        """Merge discovered clusters that resolved to the same canonical name."""
+        grouped: dict[str, list[DiscoveredCategory]] = {}
+        for category in categories:
+            grouped.setdefault(category.canonical_name, []).append(category)
+
+        merged: list[DiscoveredCategory] = []
+        for same_name in grouped.values():
+            if len(same_name) == 1:
+                merged.append(same_name[0])
+                continue
+            doc_ids: list[str] = []
+            vectors: list[np.ndarray] = []
+            for category in same_name:
+                doc_ids.extend(category.doc_ids)
+                vectors.append(category.centroid)
+            first = same_name[0]
+            merged.append(
+                DiscoveredCategory(
+                    canonical_name=first.canonical_name,
+                    display_name=first.display_name,
+                    description=first.description,
+                    doc_ids=doc_ids,
+                    centroid=centroid(vectors),
+                )
+            )
+        return merged
+
+    def _pending_requires_rebalance(self, pending_count: int) -> bool:
+        """Return whether pending volume should trigger full rebalance."""
+        total = len(self._list_clusterable_documents())
+        if total == 0:
+            return False
+        return (
+            pending_count >= cfg.PENDING_REVIEW_REBALANCE_ABSOLUTE
+            or pending_count / total >= cfg.PENDING_REVIEW_REBALANCE_RATIO
+        )
+
+    def _refresh_category_centroids(self) -> None:
+        """Recompute category centroids and doc counts after assignments."""
+        for category in self.registry.list_categories():
+            docs = self.registry.list_category_documents(category["id"])
+            vectors = [
+                emb for doc in docs
+                if (emb := self.registry.get_embedding(doc["id"])) is not None
+            ]
+            if not vectors:
+                continue
+            self.registry.upsert_category(
+                category["canonical_name"],
+                category.get("display_name") or category["canonical_name"],
+                category.get("description") or "",
+                centroid(vectors),
+                doc_count=len(docs),
+                category_id=category["id"],
+            )
+
+    def _merge_singleton_categories(self) -> None:
+        """Merge obvious singleton categories produced by over-fine coarse clustering."""
+        categories = self.registry.list_categories()
+        docs_by_category = {
+            category["id"]: self.registry.list_category_documents(category["id"])
+            for category in categories
+        }
+        groups = merge_singleton_categories_by_keywords(categories, docs_by_category)
+        if all(len(group) == 1 for group in groups):
+            return
+
+        old_by_id = {category["id"]: category for category in categories}
+        self.registry.clear_categories()
+
+        for group in groups:
+            docs: list[dict[str, object]] = []
+            vectors: list[np.ndarray] = []
+            for category_id in group:
+                for doc in docs_by_category.get(category_id, []):
+                    docs.append(doc)
+                    emb = self.registry.get_embedding(doc["id"])
+                    if emb is not None:
+                        vectors.append(emb)
+
+            titles = [str(doc.get("title") or doc.get("source_path") or "") for doc in docs]
+            summaries = [self._summary_for_doc(doc) for doc in docs]
+            canonical, display, description = name_category_with_llm(
+                self._sf_client, cfg.CLUSTER_NAMING_MODEL, titles, summaries
+            )
+            if len(group) == 1:
+                original = old_by_id[group[0]]
+                canonical = original["canonical_name"]
+                display = original.get("display_name") or canonical
+                description = original.get("description") or description
+
+            reuse_id = old_by_id[group[0]]["id"]
+            category_id = self.registry.upsert_category(
+                canonical,
+                display,
+                description,
+                centroid(vectors) if vectors else None,
+                doc_count=len(docs),
+                category_id=reuse_id,
+            )
+            for doc in docs:
+                emb = self.registry.get_embedding(doc["id"])
+                center = self.registry.get_category_centroid(category_id)
+                sim = (
+                    float(np.dot(l2_normalize(emb), center))
+                    if emb is not None and center is not None
+                    else 0.0
+                )
+                self.registry.replace_document_category(
+                    doc["id"], category_id, sim, "llm", max(0.5, sim)
+                )
 
     # ── Long document indexing ────────────────────────────────────────────
 

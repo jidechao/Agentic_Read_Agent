@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import src.config as cfg
+from src.clustering.evaluator import build_cluster_report
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +43,14 @@ class Materializer:
 
         # Gather data from registry
         docs = registry.list_documents()
-        clusters = self._get_clusters(registry, compile_run_id)
+        clusters = self._get_categories_or_clusters(registry, compile_run_id)
         summaries = doc_summaries or {}
 
         # Write files into tmp_dir
         self._write_skill_md(tmp_dir, clusters, summaries, docs)
-        self._write_short_docs_db(tmp_dir, docs, short_doc_texts or {})
+        self._write_short_docs_db(compiled_dir, tmp_dir, docs, short_doc_texts or {})
         self._write_cluster_indexes(tmp_dir, clusters, docs, summaries)
+        self._write_cluster_report(tmp_dir, registry)
 
         # Preserve pageindex_cache from current compiled_library/
         pi_cache = compiled_dir / "pageindex_cache"
@@ -65,6 +67,27 @@ class Materializer:
         logger.info("原子物化完成: %s", compiled_dir)
 
     # ── Internal helpers ────────────────────────────────────────────────
+
+    def _get_categories_or_clusters(
+        self, registry: Any, compile_run_id: int
+    ) -> list[dict[str, Any]]:
+        """Prefer stable categories, falling back to legacy per-run clusters."""
+        categories = getattr(registry, "list_categories", lambda: [])()
+        if categories:
+            clusters = []
+            for category in categories:
+                docs = registry.list_category_documents(category["id"])
+                clusters.append(
+                    {
+                        "id": category["id"],
+                        "name": category["canonical_name"],
+                        "display_name": category.get("display_name"),
+                        "description": category.get("description") or "",
+                        "doc_ids": [doc["id"] for doc in docs],
+                    }
+                )
+            return clusters
+        return self._get_clusters(registry, compile_run_id)
 
     def _get_clusters(self, registry: Any, compile_run_id: int) -> list[dict[str, Any]]:
         """Get clusters with their documents from registry."""
@@ -119,12 +142,19 @@ class Materializer:
 
     def _write_short_docs_db(
         self,
+        compiled_dir: Path,
         tmp_dir: Path,
         docs: list[dict[str, Any]],
         short_doc_texts: dict[str, str],
     ) -> None:
         """Write short_docs_db.json with full text content."""
-        short_docs = {}
+        short_docs = self._load_existing_short_docs(compiled_dir)
+        current_doc_ids = {doc["id"] for doc in docs}
+        short_docs = {
+            doc_id: entry
+            for doc_id, entry in short_docs.items()
+            if doc_id in current_doc_ids
+        }
         for doc in docs:
             if doc["tier"] != "short" or doc["status"] not in ("embedded", "compiled"):
                 continue
@@ -142,6 +172,18 @@ class Materializer:
                 json.dumps(short_docs, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+
+    @staticmethod
+    def _load_existing_short_docs(compiled_dir: Path) -> dict[str, Any]:
+        """Load previously materialized short docs so incremental runs keep old text."""
+        db_file = compiled_dir / "short_docs_db.json"
+        if not db_file.exists():
+            return {}
+        try:
+            data = json.loads(db_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
 
     def _write_cluster_indexes(
         self,
@@ -197,3 +239,10 @@ class Materializer:
             (cluster_dir / "INDEX.md").write_text(
                 "\n".join(lines) + "\n", encoding="utf-8"
             )
+
+    def _write_cluster_report(self, tmp_dir: Path, registry: Any) -> None:
+        """Write a human-readable cluster quality report."""
+        (tmp_dir / "CLUSTER_REPORT.md").write_text(
+            build_cluster_report(registry),
+            encoding="utf-8",
+        )

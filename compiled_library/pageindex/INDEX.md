@@ -1,0 +1,6 @@
+# pageindex
+
+## 长文档（PageIndex 导航）
+- ee10785d-dabb-4df5-96ba-8b65d09a8dfc: PageIndex (来源: README_CN.pdf, PageIndex索引)
+  > PageIndex、简介、特性、部署选项、快速上手、PageIndex | GITHUB TRENDING
+

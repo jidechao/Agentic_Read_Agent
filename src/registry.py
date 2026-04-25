@@ -52,8 +52,35 @@ CREATE TABLE IF NOT EXISTS document_clusters (
     PRIMARY KEY (doc_id, cluster_id)
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+    id             TEXT PRIMARY KEY,
+    canonical_name TEXT NOT NULL UNIQUE,
+    display_name   TEXT,
+    description    TEXT,
+    centroid       BLOB,
+    doc_count      INTEGER DEFAULT 0,
+    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS document_category (
+    doc_id      TEXT REFERENCES documents(id),
+    category_id TEXT REFERENCES categories(id),
+    similarity  REAL,
+    assigned_by TEXT CHECK(assigned_by IN ('embedding', 'llm', 'manual')) DEFAULT 'embedding',
+    confidence  REAL,
+    PRIMARY KEY (doc_id, category_id)
+);
+
+CREATE TABLE IF NOT EXISTS topic_summaries (
+    content_hash TEXT PRIMARY KEY,
+    summary      TEXT NOT NULL,
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_documents_content_hash ON documents(content_hash);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+CREATE INDEX IF NOT EXISTS idx_document_category_category_id ON document_category(category_id);
 """
 
 
@@ -69,6 +96,20 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
         if col in d and d[col] is not None:
             d[col] = bool(d[col])
     return d
+
+
+def _vector_to_blob(vector: np.ndarray | None) -> bytes | None:
+    """Serialize a float32 vector for SQLite storage."""
+    if vector is None:
+        return None
+    return vector.astype(np.float32).tobytes()
+
+
+def _blob_to_vector(blob: bytes | None) -> np.ndarray | None:
+    """Deserialize a float32 vector from SQLite storage."""
+    if blob is None:
+        return None
+    return np.frombuffer(blob, dtype=np.float32).copy()
 
 
 class KnowledgeRegistry:
@@ -165,6 +206,7 @@ class KnowledgeRegistry:
         conn.execute(
             "DELETE FROM document_clusters WHERE doc_id = ?", (doc_id,)
         )
+        conn.execute("DELETE FROM document_category WHERE doc_id = ?", (doc_id,))
         conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
         conn.commit()
 
@@ -247,6 +289,28 @@ class KnowledgeRegistry:
             return None
         return np.frombuffer(row["embedding"], dtype=np.float32).copy()
 
+    # ── Topic summary cache ─────────────────────────────────────────────
+
+    def cache_topic_summary(self, content_hash: str, summary: str) -> None:
+        """Cache an LLM-generated topic summary by content hash."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO topic_summaries (content_hash, summary)
+               VALUES (?, ?)
+               ON CONFLICT(content_hash) DO UPDATE SET summary = excluded.summary""",
+            (content_hash, summary),
+        )
+        conn.commit()
+
+    def get_topic_summary(self, content_hash: str) -> str | None:
+        """Return a cached topic summary by content hash."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT summary FROM topic_summaries WHERE content_hash = ?",
+            (content_hash,),
+        ).fetchone()
+        return None if row is None else row["summary"]
+
     # ── Compile runs ───────────────────────────────────────────────────
 
     def create_compile_run(self, trigger_type: str) -> int:
@@ -327,3 +391,161 @@ class KnowledgeRegistry:
                 )
         conn.commit()
         return cluster_ids
+
+    # ── Stable categories ───────────────────────────────────────────────
+
+    def upsert_category(
+        self,
+        canonical_name: str,
+        display_name: str,
+        description: str,
+        centroid: np.ndarray | None,
+        doc_count: int,
+        category_id: str | None = None,
+    ) -> str:
+        """Insert or update a stable category and return its id."""
+        conn = self._get_conn()
+        existing = conn.execute(
+            "SELECT id FROM categories WHERE canonical_name = ?",
+            (canonical_name,),
+        ).fetchone()
+        now = datetime.now(timezone.utc).isoformat()
+        blob = _vector_to_blob(centroid)
+
+        if existing:
+            cid = existing["id"]
+            conn.execute(
+                """UPDATE categories
+                   SET display_name = ?,
+                       description = ?,
+                       centroid = ?,
+                       doc_count = ?,
+                       updated_at = ?
+                   WHERE id = ?""",
+                (display_name, description, blob, doc_count, now, cid),
+            )
+        else:
+            cid = category_id or str(uuid.uuid4())
+            conn.execute(
+                """INSERT INTO categories
+                   (id, canonical_name, display_name, description, centroid, doc_count, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    cid,
+                    canonical_name,
+                    display_name,
+                    description,
+                    blob,
+                    doc_count,
+                    now,
+                    now,
+                ),
+            )
+        conn.commit()
+        return cid
+
+    def clear_categories(self) -> None:
+        """Remove stable categories and their document assignments."""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM document_category")
+        conn.execute("DELETE FROM categories")
+        conn.commit()
+
+    def list_categories(self) -> list[dict[str, Any]]:
+        """Return all stable categories ordered by creation time."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM categories ORDER BY created_at, canonical_name"
+        ).fetchall()
+        categories: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["centroid"] = _blob_to_vector(item.get("centroid"))
+            categories.append(item)
+        return categories
+
+    def get_category_centroid(self, category_id: str) -> np.ndarray | None:
+        """Return the centroid for a category."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT centroid FROM categories WHERE id = ?", (category_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return _blob_to_vector(row["centroid"])
+
+    def assign_document_category(
+        self,
+        doc_id: str,
+        category_id: str,
+        similarity: float,
+        assigned_by: str,
+        confidence: float,
+    ) -> None:
+        """Persist one document-category assignment."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO document_category
+               (doc_id, category_id, similarity, assigned_by, confidence)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(doc_id, category_id) DO UPDATE SET
+                   similarity = excluded.similarity,
+                   assigned_by = excluded.assigned_by,
+                   confidence = excluded.confidence""",
+            (doc_id, category_id, similarity, assigned_by, confidence),
+        )
+        conn.commit()
+
+    def replace_document_category(
+        self,
+        doc_id: str,
+        category_id: str,
+        similarity: float,
+        assigned_by: str,
+        confidence: float,
+    ) -> None:
+        """Replace all existing category assignments for a document."""
+        conn = self._get_conn()
+        conn.execute("DELETE FROM document_category WHERE doc_id = ?", (doc_id,))
+        conn.execute(
+            """INSERT INTO document_category
+               (doc_id, category_id, similarity, assigned_by, confidence)
+               VALUES (?, ?, ?, ?, ?)""",
+            (doc_id, category_id, similarity, assigned_by, confidence),
+        )
+        conn.commit()
+
+    def list_category_documents(self, category_id: str) -> list[dict[str, Any]]:
+        """Return documents assigned to a category with assignment metadata."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT d.*, dc.similarity, dc.assigned_by, dc.confidence
+               FROM document_category dc
+               JOIN documents d ON d.id = dc.doc_id
+               WHERE dc.category_id = ?
+               ORDER BY d.source_path""",
+            (category_id,),
+        ).fetchall()
+        return [_row_to_dict(row) for row in rows]  # type: ignore[misc]
+
+    def list_document_categories(self) -> list[dict[str, Any]]:
+        """Return all document-category assignments with document and category data."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            """SELECT dc.doc_id,
+                      dc.category_id,
+                      dc.similarity,
+                      dc.assigned_by,
+                      dc.confidence,
+                      d.source_path,
+                      d.title,
+                      d.tier,
+                      c.canonical_name,
+                      c.display_name,
+                      c.description
+               FROM document_category dc
+               JOIN documents d ON d.id = dc.doc_id
+               JOIN categories c ON c.id = dc.category_id
+               ORDER BY c.canonical_name, d.source_path"""
+        ).fetchall()
+        return [dict(row) for row in rows]

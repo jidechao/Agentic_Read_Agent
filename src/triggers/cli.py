@@ -22,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     # status
     p_status = sub.add_parser("status", help="查看注册表状态")
 
+    # eval
+    p_eval = sub.add_parser("eval", help="评估当前聚类质量")
+
     # watch
     p_watch = sub.add_parser("watch", help="监控文件变化并自动编译")
     p_watch.add_argument("--dir", type=str, help="监控目录")
@@ -69,6 +72,15 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             registry.close()
 
+    elif args.command == "eval":
+        from src.clustering.evaluator import build_cluster_report
+
+        registry = KnowledgeRegistry(cfg.KNOWLEDGE_DB)
+        try:
+            print(build_cluster_report(registry))
+        finally:
+            registry.close()
+
     elif args.command == "watch":
         from src.triggers.watcher import run_watcher
         run_watcher(getattr(args, "dir", None))
@@ -82,3 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         run_server(host=args.host, port=args.port)
 
     return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

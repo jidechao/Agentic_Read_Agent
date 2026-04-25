@@ -35,8 +35,15 @@ SHORT_DOCS_DB: Path = COMPILED_DIR / "short_docs_db.json"
 SKILL_MD: Path = COMPILED_DIR / "SKILL.md"
 
 # ── 聚类配置 ──────────────────────────────────────────────────────────
+# 兼容旧版 offline_compiler.py；新增量编译管线不再使用固定 K。
 CLUSTER_K: int = int(os.environ.get("CLUSTER_K", "0"))  # 0 = auto (sqrt(n/2))
 LONG_DOC_SUMMARY_LENGTH: int = 500  # 长文档聚类摘要截取字数
+CLUSTER_COSINE_THRESHOLD: float = float(os.environ.get("CLUSTER_COSINE_THRESHOLD", "0.30"))
+INCREMENTAL_ASSIGN_THRESHOLD: float = float(os.environ.get("INCREMENTAL_ASSIGN_THRESHOLD", "0.55"))
+PENDING_REVIEW_REBALANCE_RATIO: float = float(os.environ.get("PENDING_REVIEW_REBALANCE_RATIO", "0.10"))
+PENDING_REVIEW_REBALANCE_ABSOLUTE: int = int(os.environ.get("PENDING_REVIEW_REBALANCE_ABSOLUTE", "30"))
+LLM_SUMMARY_MAX_CHARS: int = int(os.environ.get("LLM_SUMMARY_MAX_CHARS", "80"))
+TOPIC_SUMMARY_MODEL: str = os.environ.get("TOPIC_SUMMARY_MODEL", CLUSTER_NAMING_MODEL)
 
 # ── 自动分类器配置 ──────────────────────────────────────────────────────
 CLASSIFIER_TOKEN_THRESHOLD: int = int(os.environ.get("CLASSIFIER_TOKEN_THRESHOLD", "1000"))
